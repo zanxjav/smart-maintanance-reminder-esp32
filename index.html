@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ayla Smart Monitor & Maintenance Dashboard</title>
-  <meta name="description" content="Dashboard monitoring kendaraan pribadi, trip meter, setting speed limiter ESP32, dan reminder maintenance.">
+  <title>Vehicle Monitor - Dashboard</title>
+  <meta name="description" content="Vehicle Monitor dashboard with real-time overview, trip meter, speed limiter, and maintenance reminders.">
 
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,413 +15,439 @@
 </head>
 <body>
 
-  <div class="app-container">
+  <!-- Main Mobile/Tablet Viewport Canvas -->
+  <div class="mobile-app-frame">
 
     <!-- ======================================================================
-         1. NAVBAR
+         TOP NAVIGATION BAR
          ====================================================================== -->
-    <header class="navbar">
-      <div class="brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 3c-.1.2-.1.4-.1.7v4.4c0 .6.4 1 1 1h2"/>
-            <circle cx="7" cy="17" r="2"/>
-            <circle cx="17" cy="17" r="2"/>
+    <header class="top-nav">
+      <div class="nav-left">
+        <button class="icon-btn" id="btnMenu" aria-label="Menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
-        </div>
-        <div class="brand-info">
-          <h1>Daihatsu Ayla Monitor</h1>
-          <p>Sistem Telemetri & Reminder Maintenance</p>
-        </div>
+        </button>
+        <span class="app-title">Vehicle Monitor</span>
       </div>
 
-      <div class="nav-status-group">
-        <div class="status-badge demo" id="firebaseStatusBadge">
-          <span class="dot"></span>
-          <span id="firebaseStatusText">Demo Mode</span>
-        </div>
-
-        <div class="status-badge online" id="espStatusBadge">
-          <span class="dot"></span>
-          <span id="espStatusText">ESP32: Online</span>
-        </div>
-
-        <div class="status-badge online" id="gpsStatusBadge">
-          <span class="dot"></span>
-          <span id="gpsStatusText">GPS: Connected</span>
-        </div>
-
-        <div class="clock-text" id="liveClock">14:35:00</div>
+      <div class="nav-right">
+        <button class="icon-btn notification-btn" id="btnNotifications" aria-label="Notifications">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notification-badge-dot"></span>
+        </button>
       </div>
     </header>
 
     <!-- ======================================================================
-         2. SPEED LIMIT WARNING BANNER
+         MAIN CONTENT AREA
          ====================================================================== -->
-    <div class="speed-alert" id="speedWarningBanner">
-      <div class="speed-alert-left">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-          <line x1="12" y1="9" x2="12" y2="13"/>
-          <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-        <span>Peringatan: Kecepatan (<span id="bannerCurrentSpeed">72 km/h</span>) melebihi batas <span id="bannerLimitSpeed">60 km/h</span>!</span>
-      </div>
-      <button class="btn-alert" id="btnQuickAdjustLimit">Ubah Batas</button>
-    </div>
-
-    <!-- ======================================================================
-         3. METRICS CARDS (SPEED, TRIP, ODO, MAINTENANCE)
-         ====================================================================== -->
-    <section class="metrics-grid">
+    <main class="main-content">
       
-      <!-- Kecepatan -->
-      <div class="card speed-card" id="speedHudCard">
-        <div class="card-label">
-          <span>Kecepatan Realtime</span>
-          <button class="btn-pill-limit" id="btnOpenSpeedLimitModal" title="Atur batas kecepatan ESP32">
-            Limit: <span class="val-speed-limit">60 km/h</span> ⚙
-          </button>
+      <!-- Dashboard Title & Date Row -->
+      <div class="dash-header-row">
+        <div class="dash-title-group">
+          <h2>Dashboard</h2>
+          <p>Real-time overview of your vehicle</p>
         </div>
-        <div class="card-value-wrap">
-          <span class="main-value" id="valSpeed">72</span>
-          <span class="unit">km/h</span>
-        </div>
-        <div class="card-footer">
-          <span>Sensor Kecepatan</span>
-          <span style="color: var(--success);">Aktif</span>
+        
+        <div class="datetime-pill" id="liveDateTimePill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span id="liveClockText">24 May 2025, 14:35</span>
         </div>
       </div>
 
-      <!-- Trip Meter -->
-      <div class="card">
-        <div class="card-label">
-          <span>Trip Meter</span>
-          <button class="btn-reset" id="btnResetTrip" title="Reset Trip ke 0.0">Reset</button>
-        </div>
-        <div class="card-value-wrap">
-          <span class="main-value" id="valTrip">124.6</span>
-          <span class="unit">km</span>
-        </div>
-        <div class="card-footer">
-          <span>Jarak perjalanan ini</span>
-        </div>
-      </div>
-
-      <!-- Total Odometer -->
-      <div class="card">
-        <div class="card-label">
-          <span>Total Odometer</span>
-        </div>
-        <div class="card-value-wrap">
-          <span class="main-value" id="valOdo">97,245</span>
-          <span class="unit">km</span>
-        </div>
-        <div class="card-footer">
-          <span>Total jarak tempuh mobil</span>
-        </div>
-      </div>
-
-      <!-- Status Maintenance Ringkas -->
-      <div class="card">
-        <div class="card-label">
-          <span>Kondisi Kendaraan</span>
-        </div>
-        <div class="m-summary-list">
-          <div class="m-summary-row normal">
-            <span>● Optimal:</span>
-            <strong id="summaryCountNormal">7</strong>
+      <!-- 2x2 Metric Cards Grid -->
+      <section class="metrics-2x2-grid">
+        
+        <!-- 1. SPEED CARD -->
+        <div class="metric-box speed-box" id="cardSpeed">
+          <div class="box-top">
+            <span class="box-title">Speed</span>
+            <div class="box-icon-circle blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="12 8 8 12 12 16 14 11 12 8"/>
+              </svg>
+            </div>
           </div>
-          <div class="m-summary-row warning">
-            <span>● Mendekati Servis:</span>
-            <strong id="summaryCountWarning">2</strong>
+          
+          <div class="box-middle">
+            <span class="box-val" id="valSpeed">42</span>
+            <span class="box-unit">km/h</span>
           </div>
-          <div class="m-summary-row due">
-            <span>● Jatuh Tempo:</span>
-            <strong id="summaryCountDue">1</strong>
+
+          <div class="box-bottom-wave">
+            <!-- Smooth Blue Wave -->
+            <svg viewBox="0 0 160 28" fill="none">
+              <path d="M 0,18 Q 20,8 40,18 T 80,18 T 120,8 T 160,18" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
           </div>
         </div>
-        <div class="card-footer">
-          <span id="valLastUpdate">Update: 14:35:00</span>
-        </div>
-      </div>
 
-    </section>
+        <!-- 2. TRIP CARD -->
+        <div class="metric-box trip-box" id="cardTrip">
+          <div class="box-top">
+            <span class="box-title">Trip</span>
+            <div class="box-icon-circle green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"/>
+                <circle cx="6" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </div>
+          </div>
+          
+          <div class="box-middle">
+            <span class="box-val" id="valTrip">128.6</span>
+            <span class="box-unit">km</span>
+          </div>
+
+          <div class="box-bottom-wave">
+            <!-- Smooth Green Wave -->
+            <svg viewBox="0 0 160 28" fill="none">
+              <path d="M 0,16 Q 20,22 40,16 T 80,16 T 120,22 T 160,16" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 3. ODOMETER CARD -->
+        <div class="metric-box odo-box" id="cardOdo">
+          <div class="box-top">
+            <span class="box-title">Odometer</span>
+            <div class="box-icon-circle orange">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="6" y1="12" x2="6.01" y2="12"/>
+                <line x1="10" y1="12" x2="10.01" y2="12"/>
+                <line x1="14" y1="12" x2="14.01" y2="12"/>
+                <line x1="18" y1="12" x2="18.01" y2="12"/>
+              </svg>
+            </div>
+          </div>
+          
+          <div class="box-middle">
+            <span class="box-val" id="valOdo">97,128</span>
+            <span class="box-unit">km</span>
+          </div>
+
+          <div class="box-bottom-wave">
+            <!-- Smooth Orange Wave -->
+            <svg viewBox="0 0 160 28" fill="none">
+              <path d="M 0,18 Q 30,24 60,18 T 120,18 T 160,14" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 4. STATUS CARD -->
+        <div class="metric-box status-box">
+          <div class="box-top">
+            <span class="box-title">Status</span>
+            <div class="box-icon-circle status-ok">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+          </div>
+          
+          <div>
+            <div class="status-pill-badge" id="valVehicleStatus">Normal</div>
+            <div class="status-sub-text">All systems operational</div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ====================================================================
+           SPEED OVERVIEW CARD
+           ==================================================================== -->
+      <section class="card-section speed-overview-card">
+        <div class="card-section-header">
+          <h3>Speed Overview</h3>
+          <div class="dropdown-pill">
+            <span>Real-time</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+
+        <!-- Semi-Circular Speed Gauge -->
+        <div class="speed-gauge-display">
+          <div class="gauge-svg-wrap">
+            <svg viewBox="0 0 220 125">
+              <!-- Background Arc -->
+              <path class="gauge-track-bg" d="M 25 110 A 75 75 0 0 1 195 110" />
+              <!-- Blue Progress Arc (Dynamic) -->
+              <path class="gauge-track-fill" id="speedGaugeFill" d="M 25 110 A 75 75 0 0 1 195 110" />
+            </svg>
+
+            <div class="gauge-center-text">
+              <span class="gauge-speed-num" id="valSpeedLarge">42</span>
+              <span class="gauge-speed-unit">km/h</span>
+            </div>
+          </div>
+
+          <div class="gauge-scale-labels">
+            <span>0</span>
+            <span>80</span>
+          </div>
+        </div>
+
+        <!-- Speed Limit Banner -->
+        <div class="speed-limit-banner" id="btnOpenSpeedLimit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span>Speed limit: <strong id="valSpeedLimitDisplay">60 km/h</strong></span>
+          <span class="btn-edit-limit-link">Ubah</span>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           MAINTENANCE REMINDERS SECTION
+           ==================================================================== -->
+      <section class="card-section maintenance-section">
+        <div class="card-section-header">
+          <h3>Maintenance Reminders</h3>
+          <span class="section-view-all" id="btnViewAllMaintenance">View all</span>
+        </div>
+
+        <div class="maintenance-items-list" id="maintenanceListContainer">
+          
+          <!-- Item 1: Ganti Oli Mesin -->
+          <div class="m-row-item" data-key="oil_engine">
+            <div class="m-left-group">
+              <div class="m-icon-box green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                </svg>
+              </div>
+              <div class="m-text-info">
+                <span class="m-name" id="name-oil_engine">Ganti Oli Mesin</span>
+                <span class="m-sub" id="interval-oil_engine">Setiap 7,000 km</span>
+              </div>
+            </div>
+
+            <div class="m-mid-progress">
+              <span class="m-remaining-text" id="rem-oil_engine">2,340 km lagi</span>
+              <div class="m-bar-track">
+                <div class="m-bar-fill green" id="bar-oil_engine" style="width: 66%;"></div>
+              </div>
+            </div>
+
+            <div class="m-right-group">
+              <span id="pct-oil_engine">66%</span>
+              <span class="m-arrow">›</span>
+            </div>
+          </div>
+
+          <!-- Item 2: Oli Transmisi -->
+          <div class="m-row-item" data-key="transmission_oil">
+            <div class="m-left-group">
+              <div class="m-icon-box orange">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                </svg>
+              </div>
+              <div class="m-text-info">
+                <span class="m-name" id="name-transmission_oil">Oli Transmisi</span>
+                <span class="m-sub" id="interval-transmission_oil">Setiap 20,000 km</span>
+              </div>
+            </div>
+
+            <div class="m-mid-progress">
+              <span class="m-remaining-text" id="rem-transmission_oil">12,340 km lagi</span>
+              <div class="m-bar-track">
+                <div class="m-bar-fill orange" id="bar-transmission_oil" style="width: 38%;"></div>
+              </div>
+            </div>
+
+            <div class="m-right-group">
+              <span id="pct-transmission_oil">38%</span>
+              <span class="m-arrow">›</span>
+            </div>
+          </div>
+
+          <!-- Item 3: Cairan Coolant -->
+          <div class="m-row-item" data-key="coolant">
+            <div class="m-left-group">
+              <div class="m-icon-box purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                </svg>
+              </div>
+              <div class="m-text-info">
+                <span class="m-name" id="name-coolant">Cairan Coolant</span>
+                <span class="m-sub" id="interval-coolant">Setiap 2 tahun</span>
+              </div>
+            </div>
+
+            <div class="m-mid-progress">
+              <span class="m-remaining-text" id="rem-coolant">8 bulan lagi</span>
+              <div class="m-bar-track">
+                <div class="m-bar-fill purple" id="bar-coolant" style="width: 67%;"></div>
+              </div>
+            </div>
+
+            <div class="m-right-group">
+              <span id="pct-coolant">67%</span>
+              <span class="m-arrow">›</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           RECENT ACTIVITY SECTION
+           ==================================================================== -->
+      <section class="card-section activity-section">
+        <div class="card-section-header">
+          <h3>Recent Activity</h3>
+          <span class="section-view-all" id="btnViewAllActivity">View all</span>
+        </div>
+
+        <div class="activity-row" id="recentActivityRow">
+          <div class="activity-left">
+            <span class="activity-dot" id="recentActivityDot"></span>
+            <div class="activity-text">
+              <span class="act-title" id="recentActivityTitle">Speed Alert</span>
+              <span class="act-sub" id="recentActivitySub">Overspeed: 72 km/h</span>
+            </div>
+          </div>
+          <span class="act-time" id="recentActivityTime">24 May 2025, 14:30:15</span>
+        </div>
+      </section>
+
+    </main>
 
     <!-- ======================================================================
-         4. CAR SHOWCASE (DAIHATSU AYLA SILHOUETTE) & ACTION BAR
+         BOTTOM NAVIGATION BAR (EXACT MATCHING 4 TABS)
          ====================================================================== -->
-    <section class="car-section">
-      <div class="section-header">
-        <span class="section-title">Visualisasi Kendaraan (Daihatsu Ayla)</span>
-        <div class="sensor-legend">
-          <div class="legend-item"><span class="dot" style="background: var(--success);"></span> Normal</div>
-          <div class="legend-item"><span class="dot" style="background: var(--warning);"></span> Perlu Perhatian</div>
-          <div class="legend-item"><span class="dot" style="background: var(--danger);"></span> Servis Sekarang</div>
-        </div>
-      </div>
-
-      <!-- Clean Ayla Vector Line-art Matching User's Image -->
-      <div class="car-illustration-wrap">
-        <svg class="car-vector-svg" viewBox="0 0 1000 460" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Ground Line -->
-          <line x1="40" y1="380" x2="960" y2="380" stroke="#334155" stroke-width="2" />
-
-          <!-- Ayla Silhouette Main Body -->
-          <path d="M 65,330 
-                   L 55,280 
-                   Q 55,230 78,185 
-                   L 118,105 
-                   Q 128,90 148,85 
-                   L 178,85 
-                   Q 188,92 198,102 
-                   L 255,92 
-                   Q 415,75 585,85 
-                   Q 685,105 735,175 
-                   L 815,210 
-                   Q 880,235 915,270 
-                   L 930,310 
-                   Q 932,340 915,355 
-                   L 875,360 
-                   A 68 68 0 0 0 735,360 
-                   L 315,360 
-                   A 68 68 0 0 0 175,360 
-                   L 90,360 
-                   Q 65,350 65,330 Z" 
-                fill="#131c2e" 
-                stroke="#64748b" 
-                stroke-width="2" />
-
-          <!-- Roof Spoiler -->
-          <path d="M 118,105 Q 132,85 172,85 L 178,98 Q 142,100 128,115 Z" fill="#334155" />
-
-          <!-- Glass / Windows Frame -->
-          <path d="M 440,110 L 580,112 Q 660,130 695,185 L 440,185 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
-          <path d="M 270,118 L 425,110 L 425,185 L 270,185 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
-          <path d="M 200,128 L 255,120 L 255,185 L 220,185 Q 200,160 200,128 Z" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
-
-          <!-- Pillars & Door Cutouts -->
-          <line x1="432" y1="95" x2="432" y2="355" stroke="#475569" stroke-width="1.5" />
-          <path d="M 265,118 L 265,185 Q 175,240 175,360" stroke="#475569" stroke-width="1.5" fill="none" />
-          <path d="M 730,180 Q 775,230 740,360" stroke="#475569" stroke-width="1.5" fill="none" />
-
-          <!-- Headlight & Taillight -->
-          <path d="M 825,218 Q 880,235 915,270 L 875,290 Q 840,260 825,218 Z" fill="#38bdf8" opacity="0.3" stroke="#38bdf8" stroke-width="1.5" />
-          <path d="M 70,210 Q 58,245 58,275 L 88,280 Q 90,230 82,210 Z" fill="#ef4444" opacity="0.7" stroke="#ef4444" stroke-width="1.5" />
-
-          <!-- Door Handles & Side Mirror -->
-          <rect x="460" y="222" width="34" height="9" rx="3" fill="#334155" stroke="#64748b" stroke-width="1" />
-          <rect x="215" y="205" width="34" height="9" rx="3" fill="#334155" stroke="#64748b" stroke-width="1" />
-          <path d="M 665,165 Q 705,165 705,195 L 665,195 Z" fill="#334155" stroke="#64748b" stroke-width="1.5" />
-
-          <!-- Side Moulding & Ayla Decal Text -->
-          <line x1="255" y1="288" x2="702" y2="305" stroke="#475569" stroke-width="1.5" />
-          <text x="310" y="340" fill="#94a3b8" font-family="Inter" font-size="12" font-weight="700">AYLA VVT-i</text>
-
-          <!-- Front Wheel -->
-          <g transform="translate(805, 360)">
-            <circle cx="0" cy="0" r="58" fill="#0f172a" stroke="#334155" stroke-width="4" />
-            <circle cx="0" cy="0" r="42" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
-            <circle cx="0" cy="0" r="8" fill="#94a3b8" />
-            <line x1="-34" y1="0" x2="34" y2="0" stroke="#64748b" stroke-width="2.5" />
-            <line x1="-17" y1="-29" x2="17" y2="29" stroke="#64748b" stroke-width="2.5" />
-            <line x1="-17" y1="29" x2="17" y2="-29" stroke="#64748b" stroke-width="2.5" />
-          </g>
-
-          <!-- Rear Wheel -->
-          <g transform="translate(245, 360)">
-            <circle cx="0" cy="0" r="58" fill="#0f172a" stroke="#334155" stroke-width="4" />
-            <circle cx="0" cy="0" r="42" fill="#1e293b" stroke="#64748b" stroke-width="1.5" />
-            <circle cx="0" cy="0" r="8" fill="#94a3b8" />
-            <line x1="-34" y1="0" x2="34" y2="0" stroke="#64748b" stroke-width="2.5" />
-            <line x1="-17" y1="-29" x2="17" y2="29" stroke="#64748b" stroke-width="2.5" />
-            <line x1="-17" y1="29" x2="17" y2="-29" stroke="#64748b" stroke-width="2.5" />
-          </g>
-
-          <!-- ================================================================
-               CLEAN SENSOR STATUS DOTS ON VEHICLE
-               ================================================================ -->
-          
-          <!-- 1. Oli Mesin / Busi -->
-          <g class="sensor-pin pin-normal" id="node-engine" transform="translate(735, 240)">
-            <circle cx="0" cy="0" r="7" />
-            <text x="11" y="4" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">Mesin / Oli</text>
-          </g>
-
-          <!-- 2. Radiator Coolant -->
-          <g class="sensor-pin pin-due" id="node-coolant" transform="translate(865, 260)">
-            <circle cx="0" cy="0" r="7" />
-            <text x="11" y="4" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">Radiator</text>
-          </g>
-
-          <!-- 3. Filter Udara -->
-          <g class="sensor-pin pin-warning" id="node-air-filter" transform="translate(780, 205)">
-            <circle cx="0" cy="0" r="7" />
-            <text x="11" y="4" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">Filter Udara</text>
-          </g>
-
-          <!-- 4. Transmisi -->
-          <g class="sensor-pin pin-normal" id="node-transmission" transform="translate(625, 290)">
-            <circle cx="0" cy="0" r="7" />
-            <text x="11" y="4" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">Transmisi</text>
-          </g>
-
-          <!-- 5. Aki / Battery -->
-          <g class="sensor-pin pin-normal" id="node-battery" transform="translate(685, 200)">
-            <circle cx="0" cy="0" r="7" />
-            <text x="11" y="4" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">Aki (12V)</text>
-          </g>
-
-          <!-- 6. Rem Depan -->
-          <g class="sensor-pin pin-normal" id="node-brakes-front" transform="translate(805, 360)">
-            <circle cx="0" cy="0" r="7" />
-          </g>
-
-          <!-- 7. Rem Belakang -->
-          <g class="sensor-pin pin-normal" id="node-brakes-rear" transform="translate(245, 360)">
-            <circle cx="0" cy="0" r="7" />
-          </g>
-
+    <nav class="bottom-nav">
+      <!-- 1. Dashboard Tab -->
+      <button class="nav-tab-item active" id="tabNavDashboard" data-tab="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
         </svg>
-      </div>
+        <span>Dashboard</span>
+      </button>
 
-      <!-- Action Bar -->
-      <div class="action-bar">
-        <button class="btn-cta" id="btnCheckMaintenance">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-          </svg>
-          Buka Jadwal & Pengaturan Maintenance
-        </button>
+      <!-- 2. Trip Tab -->
+      <button class="nav-tab-item" id="tabNavTrip" data-tab="trip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>Trip</span>
+      </button>
 
-        <div class="sim-group">
-          <span style="font-size: 0.75rem; color: var(--text-dim);">Simulasi:</span>
-          <button class="btn-sm" id="btnSimSpeedSpike">⚡ Speed &gt; 60</button>
-          <button class="btn-sm" id="btnSimNormalSpeed">✓ Normal 55</button>
-          <button class="btn-sm" id="btnSimOdoWarning">⚠ Warning ODO</button>
-          <button class="btn-sm" id="btnSimOdoDue">✕ Due ODO</button>
-        </div>
-      </div>
+      <!-- 3. Maintenance Tab -->
+      <button class="nav-tab-item" id="tabNavMaintenance" data-tab="maintenance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+        <span>Maintenance</span>
+      </button>
 
-    </section>
+      <!-- 4. Settings Tab -->
+      <button class="nav-tab-item" id="tabNavSettings" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
 
   </div>
 
   <!-- ========================================================================
-       5. MODAL SETTING SPEED LIMITER ESP32
+       MODAL: SPEED LIMIT SETTING (ESP32)
        ======================================================================== -->
   <div class="modal-backdrop" id="modalSpeedLimit">
-    <div class="modal">
+    <div class="modal-card">
       <div class="modal-header">
-        <h3>Pengaturan Speed Limiter ESP32</h3>
+        <h3>Setting Speed Limit (ESP32)</h3>
         <button class="btn-close modal-close-trigger">✕</button>
       </div>
+
       <form id="formSpeedLimit">
         <div class="modal-body">
-          <p style="font-size: 0.82rem; color: var(--text-muted);">
-            Tentukan batas kecepatan maksimum. Nilai ini akan disimpan ke Firebase dan dibaca oleh ESP32 untuk memicu alarm jika mobil melaju melebihi batas.
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            Tentukan ambang batas kecepatan. Nilai ini akan disinkronkan ke Firebase dan memicu alarm ESP32 jika kecepatan mobil melampaui limit.
           </p>
 
-          <div class="limiter-box">
-            <div class="limiter-number">
+          <div class="limiter-slider-box">
+            <div class="limiter-big-text">
               <span id="speedLimitSliderVal">60</span>
-              <span style="font-size: 1.2rem; color: var(--text-muted); font-weight: 500;">km/h</span>
+              <span style="font-size: 1.2rem; font-weight: 500; color: var(--text-muted);">km/h</span>
             </div>
-            
-            <input type="range" id="speedLimitRange" class="slider-input" min="30" max="160" step="5" value="60">
 
-            <div class="preset-btns">
-              <button type="button" class="btn-preset" data-val="40">40 km/h</button>
-              <button type="button" class="btn-preset active" data-val="60">60 km/h</button>
-              <button type="button" class="btn-preset" data-val="80">80 km/h</button>
-              <button type="button" class="btn-preset" data-val="100">100 km/h</button>
-              <button type="button" class="btn-preset" data-val="120">120 km/h</button>
+            <input type="range" id="speedLimitRange" class="slider-ctrl" min="30" max="140" step="5" value="60">
+
+            <div class="preset-row">
+              <button type="button" class="btn-pre" data-val="40">40 km/h</button>
+              <button type="button" class="btn-pre active" data-val="60">60 km/h</button>
+              <button type="button" class="btn-pre" data-val="80">80 km/h</button>
+              <button type="button" class="btn-pre" data-val="100">100 km/h</button>
             </div>
           </div>
         </div>
+
         <div class="modal-footer">
-          <button type="button" class="btn-secondary modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-primary">Simpan ke ESP32</button>
+          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
+          <button type="submit" class="btn-pri">Simpan Limit</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- ========================================================================
-       6. MAINTENANCE DRAWER (SCHEDULES, INTERVAL SETTINGS, HISTORY)
+       MODAL: MAINTENANCE MANAGER (SCHEDULES, INTERVAL SETTINGS, RECORD SERVICE)
        ======================================================================== -->
-  <div class="drawer-backdrop" id="drawerBackdrop">
-    <aside class="drawer">
-      
-      <div class="drawer-header">
-        <h2>Perawatan & Servis Kendaraan</h2>
-        <button class="btn-close" id="btnCloseDrawer">✕</button>
+  <div class="modal-backdrop" id="modalMaintenanceManager">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3>Manajemen Maintenance</h3>
+        <button class="btn-close modal-close-trigger">✕</button>
       </div>
 
-      <div class="drawer-tabs">
-        <button class="tab-btn active" data-tab="tab-schedules">Jadwal Servis</button>
-        <button class="tab-btn" data-tab="tab-settings">Setting Interval</button>
-        <button class="tab-btn" data-tab="tab-history">Riwayat Servis</button>
+      <div class="modal-body" style="padding: 1.1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 700;">Daftar Jadwal Perawatan</h4>
+          <button class="btn-pri" id="btnOpenAddServiceForm" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">+ Catat Servis</button>
+        </div>
+
+        <div id="fullMaintenanceListContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Dynamically populated -->
+        </div>
       </div>
 
-      <div class="drawer-content">
-        
-        <!-- TAB 1: JADWAL SERVIS -->
-        <div class="tab-pane active" id="tab-schedules">
-          <div class="toolbar">
-            <button class="btn-primary" id="btnOpenAddServiceModal">+ Catat Servis Baru</button>
-            <select id="maintenanceStatusFilter" class="select-box">
-              <option value="ALL">Semua Status</option>
-              <option value="NORMAL">Normal</option>
-              <option value="WARNING">Mendekati Servis</option>
-              <option value="DUE">Jatuh Tempo (Due)</option>
-            </select>
-          </div>
-
-          <div class="m-cards-list" id="maintenanceCardsContainer">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
-        <!-- TAB 2: SETTING INTERVAL DINAMIS -->
-        <div class="tab-pane" id="tab-settings">
-          <div class="toolbar">
-            <div>
-              <h3 style="font-size: 0.95rem; font-weight: 700; color: #fff;">Pengaturan Interval Perawatan</h3>
-              <p style="font-size: 0.75rem; color: var(--text-muted);">Ubah batas kilometer atau bulan untuk setiap komponen.</p>
-            </div>
-            <button class="btn-primary" id="btnAddCustomSetting">+ Tambah Komponen</button>
-          </div>
-
-          <div class="settings-list" id="settingsListContainer">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
-        <!-- TAB 3: RIWAYAT SERVIS -->
-        <div class="tab-pane" id="tab-history">
-          <div class="toolbar">
-            <h3 style="font-size: 0.95rem; font-weight: 700; color: #fff;">Riwayat Servis Tercatat</h3>
-            <select id="historyFilterSelect" class="select-box">
-              <option value="ALL">Semua Komponen</option>
-            </select>
-          </div>
-
-          <div class="history-list" id="historyTimelineContainer">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
+      <div class="modal-footer">
+        <button type="button" class="btn-sec modal-close-trigger">Tutup</button>
       </div>
-
-    </aside>
+    </div>
   </div>
 
   <!-- ========================================================================
-       7. MODAL INPUT CATAT SERVIS BARU
+       MODAL: INPUT CATAT SERVIS
        ======================================================================== -->
   <div class="modal-backdrop" id="modalAddService">
-    <div class="modal">
+    <div class="modal-card">
       <div class="modal-header">
         <h3>Catat Servis Selesai</h3>
         <button class="btn-close modal-close-trigger">✕</button>
@@ -429,121 +455,50 @@
 
       <form id="formAddService">
         <div class="modal-body">
-          
-          <div class="field-group">
-            <label class="field-label" for="serviceTypeSelect">Tipe Servis</label>
-            <select id="serviceTypeSelect" class="field-input" required></select>
+          <div class="form-group">
+            <label class="form-label" for="serviceTypeSelect">Tipe Servis</label>
+            <select id="serviceTypeSelect" class="form-input" required></select>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-            <div class="field-group">
-              <label class="field-label" for="serviceOdoInput">Odometer Saat Servis (KM)</label>
-              <input type="number" id="serviceOdoInput" class="field-input" required value="97245">
+            <div class="form-group">
+              <label class="form-label" for="serviceOdoInput">Odometer Saat Servis</label>
+              <input type="number" id="serviceOdoInput" class="form-input" required value="97128">
             </div>
 
-            <div class="field-group">
-              <label class="field-label" for="serviceDateInput">Tanggal Servis</label>
-              <input type="date" id="serviceDateInput" class="field-input" required>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label class="field-label">Sparepart yang Diganti / Dikerjakan</label>
-            <div class="checkbox-grid">
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Engine Oil"> Oli Mesin
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Oil Filter"> Filter Oli
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Air Filter"> Filter Udara
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Radiator Coolant"> Air Radiator
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Spark Plugs"> Busi
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Transmission Fluid"> Oli Transmisi
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Brake Fluid"> Minyak Rem
-              </label>
-              <label class="checkbox-item">
-                <input type="checkbox" class="part-checkbox" value="Brake Pads"> Kampas Rem
-              </label>
+            <div class="form-group">
+              <label class="form-label" for="serviceDateInput">Tanggal Servis</label>
+              <input type="date" id="serviceDateInput" class="form-input" required>
             </div>
           </div>
 
-          <div class="field-group">
-            <label class="field-label" for="serviceNotesInput">Catatan Tambahan</label>
-            <textarea id="serviceNotesInput" class="field-input" rows="2" placeholder="Contoh: Menggunakan oli Synthetic 5W-30. Tarikan mesin terasa enteng."></textarea>
+          <div class="form-group">
+            <label class="form-label">Item yang Diganti</label>
+            <div class="checkbox-wrap">
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Engine Oil"> Oli Mesin</label>
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Oil Filter"> Filter Oli</label>
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Air Filter"> Filter Udara</label>
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Radiator Coolant"> Coolant</label>
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Transmission Fluid"> Oli Transmisi</label>
+              <label class="cb-item"><input type="checkbox" class="part-cb" value="Brake Fluid"> Minyak Rem</label>
+            </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="serviceNotesInput">Catatan</label>
+            <textarea id="serviceNotesInput" class="form-input" rows="2" placeholder="Catatan mekanik..."></textarea>
+          </div>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-primary">Simpan Record Servis</button>
+          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
+          <button type="submit" class="btn-pri">Simpan</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ========================================================================
-       8. MODAL TAMBAH CUSTOM MAINTENANCE ITEM
-       ======================================================================== -->
-  <div class="modal-backdrop" id="modalAddCustomSetting">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Tambah Komponen Perawatan Baru</h3>
-        <button class="btn-close modal-close-trigger">✕</button>
-      </div>
-
-      <form id="formAddCustomSetting">
-        <div class="modal-body">
-          
-          <div class="field-group">
-            <label class="field-label" for="customNameInput">Nama Komponen / Servis</label>
-            <input type="text" id="customNameInput" class="field-input" placeholder="Contoh: Ganti Fan Belt / V-Belt" required>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-            <div class="field-group">
-              <label class="field-label" for="customKmInput">Interval (KM)</label>
-              <input type="number" id="customKmInput" class="field-input" value="40000" required>
-            </div>
-
-            <div class="field-group">
-              <label class="field-label" for="customMonthsInput">Interval (Bulan)</label>
-              <input type="number" id="customMonthsInput" class="field-input" value="24" required>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-            <div class="field-group">
-              <label class="field-label" for="customRemKmInput">Reminder Sebelum (KM)</label>
-              <input type="number" id="customRemKmInput" class="field-input" value="1000" required>
-            </div>
-
-            <div class="field-group">
-              <label class="field-label" for="customRemDaysInput">Reminder Sebelum (Hari)</label>
-              <input type="number" id="customRemDaysInput" class="field-input" value="14" required>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-primary">Tambahkan</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
+  <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
   <script type="module" src="./js/app.js"></script>
