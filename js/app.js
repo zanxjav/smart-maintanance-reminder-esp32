@@ -1,11 +1,10 @@
 /**
- * VEHICLE SCADA DASHBOARD - MAIN APPLICATION CONTROLLER
+ * VEHICLE MONITORING & MAINTENANCE CONTROLLER
  * 
- * Minimalist automotive monitoring orchestrator:
- * - Speed HUD & dynamic speed limiter modal
- * - Trip meter, ODO, GPS, and ESP32 heartbeat
- * - Daihatsu Ayla SVG SCADA sensor hotspot mapping
- * - Automatic maintenance tracking & configurable intervals
+ * Clean, simple, and functional logic for:
+ * - Realtime speed, trip, and odometer telemetry
+ * - Dedicated ESP32 speed limiter settings
+ * - Automatic maintenance tracking, configurable intervals, and service history
  */
 
 import { initFirebaseService, subscribeVehicleData, subscribeSpeedLimit, subscribeMaintenanceSettings, subscribeMaintenanceStatus, subscribeServiceHistory, writeSpeedLimit, isFirebaseActive } from './firebase.js';
@@ -16,8 +15,8 @@ let currentSpeed = 72;
 let currentSpeedLimit = 60;
 let currentOdo = 97245;
 let currentTrip = 124.6;
-let currentGps = "CONNECTED";
-let currentEsp32 = "ONLINE";
+let currentGps = "Connected";
+let currentEsp32 = "Online";
 let activeFilter = "ALL";
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -25,11 +24,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupUIEvents();
   setupSpeedLimiterModal();
 
-  // Initialize Firebase or Fallback to Demo Mode
+  // Initialize Firebase or local Demo mode
   const initResult = await initFirebaseService();
   updateConnectionBadge(initResult.status);
 
-  // Subscribe to vehicle data stream
+  // Subscribe to vehicle data
   subscribeVehicleData((data) => {
     handleVehicleDataUpdate(data);
   });
@@ -53,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderServiceHistory();
   });
 
-  // Start simulation if offline / demo mode
+  // Start simulation if in demo mode
   if (!isFirebaseActive()) {
     demoSimulator.start();
   }
@@ -67,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ==========================================================================
-   TOP BAR CLOCK & BADGES
+   CLOCK & BADGES
    ========================================================================== */
 function initClock() {
   const clockEl = document.getElementById('liveClock');
@@ -88,11 +87,11 @@ function updateConnectionBadge(status) {
   if (!badge || !label) return;
 
   if (status === 'CONNECTED') {
-    badge.className = 'status-badge connected';
-    label.textContent = 'FIREBASE CONNECTED';
+    badge.className = 'status-badge online';
+    label.textContent = 'Firebase Connected';
   } else {
-    badge.className = 'status-badge demo-mode';
-    label.textContent = 'DEMO MODE';
+    badge.className = 'status-badge demo';
+    label.textContent = 'Demo Mode';
   }
 }
 
@@ -108,7 +107,7 @@ function handleVehicleDataUpdate(data) {
   currentGps = data.gps || currentGps;
   currentEsp32 = data.esp32 || currentEsp32;
 
-  // DOM elements
+  // Update DOM values
   const speedEl = document.getElementById('valSpeed');
   if (speedEl) speedEl.textContent = currentSpeed;
 
@@ -121,16 +120,7 @@ function handleVehicleDataUpdate(data) {
   const lastUpdateEl = document.getElementById('valLastUpdate');
   if (lastUpdateEl) lastUpdateEl.textContent = `Update: ${data.lastUpdate || data.time || "-"}`;
 
-  // Gauge circular arc (Max speed 200 km/h)
-  const maxSpeed = 200;
-  const clampedSpeed = Math.min(maxSpeed, Math.max(0, currentSpeed));
-  const arcLength = 260;
-  const offset = arcLength - (clampedSpeed / maxSpeed) * arcLength;
-
-  const gaugeFill = document.getElementById('speedGaugeFill');
-  if (gaugeFill) gaugeFill.style.strokeDashoffset = offset;
-
-  // Speed Limit Over-Speed Alert
+  // Speed Limit Warning Check
   const speedCard = document.getElementById('speedHudCard');
   const warningBanner = document.getElementById('speedWarningBanner');
   const bannerSpeedVal = document.getElementById('bannerCurrentSpeed');
@@ -140,8 +130,8 @@ function handleVehicleDataUpdate(data) {
     if (speedCard) speedCard.classList.add('over-limit');
     if (warningBanner) {
       warningBanner.classList.add('active');
-      if (bannerSpeedVal) bannerSpeedVal.textContent = `${currentSpeed} KM/H`;
-      if (bannerLimitVal) bannerLimitVal.textContent = `${currentSpeedLimit} KM/H`;
+      if (bannerSpeedVal) bannerSpeedVal.textContent = `${currentSpeed} km/h`;
+      if (bannerLimitVal) bannerLimitVal.textContent = `${currentSpeedLimit} km/h`;
     }
   } else {
     if (speedCard) speedCard.classList.remove('over-limit');
@@ -154,12 +144,12 @@ function handleVehicleDataUpdate(data) {
 
 function updateSpeedLimitDisplay(limit) {
   document.querySelectorAll('.val-speed-limit').forEach(el => {
-    el.textContent = `${limit} KM/H`;
+    el.textContent = `${limit} km/h`;
   });
 }
 
 /* ==========================================================================
-   DASHBOARD HEALTH & AYLA SCADA SENSOR PINS
+   DASHBOARD HEALTH & CAR SENSOR STATUSES
    ========================================================================== */
 function renderDashboardHealth() {
   const summary = maintenanceEngine.recalculateAllStatuses();
@@ -172,13 +162,13 @@ function renderDashboardHealth() {
   if (warningCountEl) warningCountEl.textContent = summary.warning;
   if (dueCountEl) dueCountEl.textContent = summary.due;
 
-  // Update sensor pins on Ayla SVG
+  // Update dots on Ayla SVG
   const allCards = maintenanceEngine.getAllCardsData();
   allCards.forEach(item => {
     if (item.sensorNodeId) {
       const nodeEl = document.getElementById(item.sensorNodeId);
       if (nodeEl) {
-        nodeEl.className.baseVal = `scada-node node-status-${item.status.toLowerCase()}`;
+        nodeEl.className.baseVal = `sensor-pin pin-${item.status.toLowerCase()}`;
         nodeEl.setAttribute('data-key', item.key);
       }
     }
@@ -186,7 +176,7 @@ function renderDashboardHealth() {
 }
 
 /* ==========================================================================
-   SPEED LIMITER MODAL CONTROLLER (FOR ESP32)
+   SPEED LIMITER MODAL CONTROLLER (ESP32)
    ========================================================================== */
 function setupSpeedLimiterModal() {
   const modal = document.getElementById('modalSpeedLimit');
@@ -238,14 +228,14 @@ function setupSpeedLimiterModal() {
       await writeSpeedLimit(newLimit);
       updateSpeedLimitDisplay(newLimit);
       closeAllModals();
-      showToast(`Speed limit ESP32 diset ke ${newLimit} KM/H`, 'success');
+      showToast(`Speed limit diset ke ${newLimit} km/h (Tersimpan ke ESP32)`, 'success');
       handleVehicleDataUpdate({ speed: currentSpeed, odo: currentOdo, trip: currentTrip });
     });
   }
 }
 
 /* ==========================================================================
-   MAINTENANCE CARDS (TAB 1)
+   MAINTENANCE CARDS (DRAWER TAB 1)
    ========================================================================== */
 function renderMaintenanceCards() {
   const container = document.getElementById('maintenanceCardsContainer');
@@ -261,45 +251,45 @@ function renderMaintenanceCards() {
 
   container.innerHTML = filtered.map(item => `
     <div class="m-card status-${item.status.toLowerCase()}" id="card-${item.key}">
-      <div class="m-card-header">
-        <h4 class="m-card-title">${item.name.toUpperCase()}</h4>
-        <span class="m-card-badge">${item.status}</span>
+      <div class="m-card-top">
+        <span class="m-card-title">${item.name}</span>
+        <span class="status-tag">${item.status}</span>
       </div>
 
-      <div class="m-card-info-grid">
+      <div class="m-details-grid">
         <div>
-          <span class="m-info-label">INTERVAL</span>
-          <div class="m-info-val-primary">${maintenanceEngine.formatNumber(item.intervalKm)} KM</div>
-          <div class="m-info-val-sub">${item.intervalMonths} BULAN</div>
-        </div>
-        <div>
-          <span class="m-info-label">LAST SERVICE</span>
-          <div class="m-info-val-primary">${maintenanceEngine.formatNumber(item.lastServiceOdo)} KM</div>
-          <div class="m-info-val-sub">${maintenanceEngine.formatDisplayDate(item.lastServiceDate)}</div>
+          <span class="d-label">Interval</span>
+          <div class="d-val">${maintenanceEngine.formatNumber(item.intervalKm)} KM</div>
+          <div class="d-sub">${item.intervalMonths} Bulan</div>
         </div>
         <div>
-          <span class="m-info-label">NEXT SERVICE</span>
-          <div class="m-info-val-primary">${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</div>
-          <div class="m-info-val-sub">${maintenanceEngine.formatDisplayDate(item.nextServiceDate)}</div>
+          <span class="d-label">Servis Terakhir</span>
+          <div class="d-val">${maintenanceEngine.formatNumber(item.lastServiceOdo)} KM</div>
+          <div class="d-sub">${maintenanceEngine.formatDisplayDate(item.lastServiceDate)}</div>
         </div>
-      </div>
-
-      <div class="m-progress-container">
-        <div class="m-progress-meta">
-          <span>PROGRESS PEMAKAIAN</span>
-          <span><strong>${item.progressPercent}%</strong> (${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM LAGI` : 'JATUH TEMPO'})</span>
-        </div>
-        <div class="m-progress-track">
-          <div class="m-progress-fill" style="width: ${item.progressPercent}%"></div>
+        <div>
+          <span class="d-label">Servis Berikutnya</span>
+          <div class="d-val">${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</div>
+          <div class="d-sub">${maintenanceEngine.formatDisplayDate(item.nextServiceDate)}</div>
         </div>
       </div>
 
-      <div class="m-card-footer">
-        <button class="btn-card-action btn-edit-schedule" data-key="${item.key}">
-          ⚙ Ubah Interval
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span>Pemakaian: <strong>${item.progressPercent}%</strong></span>
+          <span>${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM tersisa` : 'Jatuh tempo servis!'}</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: ${item.progressPercent}%"></div>
+        </div>
+      </div>
+
+      <div class="m-card-actions">
+        <button class="btn-secondary btn-edit-schedule" data-key="${item.key}">
+          Ubah Interval
         </button>
-        <button class="btn-card-action log-service btn-log-single" data-key="${item.key}" data-name="${item.name}">
-          ✓ Catat Service
+        <button class="btn-primary btn-log-single" data-key="${item.key}" data-name="${item.name}">
+          Catat Servis
         </button>
       </div>
     </div>
@@ -315,13 +305,13 @@ function renderMaintenanceCards() {
       setTimeout(() => {
         const card = document.getElementById(`setting-card-${btn.dataset.key}`);
         if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 150);
+      }, 100);
     });
   });
 }
 
 /* ==========================================================================
-   SETTINGS LIST (TAB 2)
+   SETTINGS LIST (DRAWER TAB 2)
    ========================================================================== */
 function renderSettingsList() {
   const container = document.getElementById('settingsListContainer');
@@ -332,30 +322,30 @@ function renderSettingsList() {
   container.innerHTML = Object.keys(settings).map(key => {
     const s = settings[key];
     return `
-      <div class="settings-item-card" id="setting-card-${key}">
-        <div class="settings-item-header">
-          <h4 class="settings-item-title">${s.name}</h4>
-          <button class="btn-card-action btn-save-setting" data-key="${key}">
-            💾 Simpan Interval
+      <div class="setting-row-card" id="setting-card-${key}">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff;">${s.name}</h4>
+          <button class="btn-primary btn-save-setting" data-key="${key}">
+            Simpan
           </button>
         </div>
 
-        <div class="settings-inputs-grid">
-          <div class="input-group">
-            <label class="input-label">INTERVAL KM</label>
-            <input type="number" class="input-control" id="input-km-${key}" value="${s.intervalKm}" step="500">
+        <div class="setting-inputs">
+          <div class="field-group">
+            <label class="field-label">Interval (KM)</label>
+            <input type="number" class="field-input" id="input-km-${key}" value="${s.intervalKm}" step="500">
           </div>
-          <div class="input-group">
-            <label class="input-label">INTERVAL BULAN</label>
-            <input type="number" class="input-control" id="input-months-${key}" value="${s.intervalMonths}" min="1">
+          <div class="field-group">
+            <label class="field-label">Interval (Bulan)</label>
+            <input type="number" class="field-input" id="input-months-${key}" value="${s.intervalMonths}" min="1">
           </div>
-          <div class="input-group">
-            <label class="input-label">REMINDER PRE-KM</label>
-            <input type="number" class="input-control" id="input-rem-km-${key}" value="${s.reminderKm || 500}">
+          <div class="field-group">
+            <label class="field-label">Reminder (KM)</label>
+            <input type="number" class="field-input" id="input-rem-km-${key}" value="${s.reminderKm || 500}">
           </div>
-          <div class="input-group">
-            <label class="input-label">REMINDER PRE-HARI</label>
-            <input type="number" class="input-control" id="input-rem-days-${key}" value="${s.reminderDays || 7}">
+          <div class="field-group">
+            <label class="field-label">Reminder (Hari)</label>
+            <input type="number" class="field-input" id="input-rem-days-${key}" value="${s.reminderDays || 7}">
           </div>
         </div>
       </div>
@@ -379,7 +369,7 @@ function renderSettingsList() {
 }
 
 /* ==========================================================================
-   SERVICE HISTORY TIMELINE (TAB 3)
+   SERVICE HISTORY TIMELINE (DRAWER TAB 3)
    ========================================================================== */
 function renderServiceHistory() {
   const container = document.getElementById('historyTimelineContainer');
@@ -390,26 +380,20 @@ function renderServiceHistory() {
   const filtered = historyFilter === 'ALL' ? history : history.filter(h => h.type === historyFilter);
 
   if (filtered.length === 0) {
-    container.innerHTML = `<p style="color: var(--text-dim); text-align: center; padding: 2rem;">Belum ada riwayat service tercatat.</p>`;
+    container.innerHTML = `<p style="color: var(--text-dim); text-align: center; padding: 2rem;">Belum ada catatan servis.</p>`;
     return;
   }
 
   container.innerHTML = filtered.map(item => `
-    <div class="history-item">
-      <div class="history-item-dot"></div>
-      <div class="history-card">
-        <div class="history-header">
-          <h4 class="history-title">${item.typeName || "Service Mobil"}</h4>
-          <div class="history-date-odo">
-            <span>📅 ${maintenanceEngine.formatDisplayDate(item.date)}</span>
-            <span>⚡ ${maintenanceEngine.formatNumber(item.odo)} KM</span>
-          </div>
-        </div>
-        <div class="history-items-tags">
-          ${(item.items || []).map(t => `<span class="history-tag">✓ ${t}</span>`).join('')}
-        </div>
-        ${item.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 4px;">${escapeHtml(item.notes)}</div>` : ''}
+    <div class="history-card">
+      <div class="history-top">
+        <span class="history-title">${item.typeName || "Servis Mobil"}</span>
+        <span class="history-date">${maintenanceEngine.formatDisplayDate(item.date)} • ${maintenanceEngine.formatNumber(item.odo)} KM</span>
       </div>
+      <div class="tag-list">
+        ${(item.items || []).map(t => `<span class="tag">✓ ${t}</span>`).join('')}
+      </div>
+      ${item.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(item.notes)}</div>` : ''}
     </div>
   `).join('');
 }
@@ -433,7 +417,7 @@ function setupUIEvents() {
   }
 
   // Drawer tabs
-  document.querySelectorAll('.drawer-tab-btn').forEach(btn => {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchDrawerTab(btn.dataset.tab));
   });
 
@@ -452,7 +436,7 @@ function setupUIEvents() {
     btnResetTrip.addEventListener('click', () => {
       demoSimulator.trip = 0.0;
       demoSimulator.tick();
-      showToast('Trip meter telah direset ke 0.0 KM', 'success');
+      showToast('Trip meter direset ke 0.0 km', 'success');
     });
   }
 
@@ -481,7 +465,7 @@ function setupUIEvents() {
   });
 
   // SVG Hotspots click
-  document.querySelectorAll('.scada-node').forEach(node => {
+  document.querySelectorAll('.sensor-pin').forEach(node => {
     node.addEventListener('click', () => {
       const key = node.getAttribute('data-key');
       openMaintenanceDrawer(key);
@@ -491,19 +475,19 @@ function setupUIEvents() {
   // Quick Sim buttons
   document.getElementById('btnSimSpeedSpike')?.addEventListener('click', () => {
     demoSimulator.setSpeed(95);
-    showToast('Simulasi: Kecepatan dinaikkan ke 95 KM/H (Melebihi Speed Limit)!', 'warning');
+    showToast('Simulasi: Kecepatan dinaikkan ke 95 km/h (Over-Speed)!', 'warning');
   });
   document.getElementById('btnSimNormalSpeed')?.addEventListener('click', () => {
     demoSimulator.setSpeed(55);
-    showToast('Simulasi: Kecepatan normal 55 KM/H.', 'success');
+    showToast('Simulasi: Kecepatan normal 55 km/h.', 'success');
   });
   document.getElementById('btnSimOdoWarning')?.addEventListener('click', () => {
     demoSimulator.setOdo(99650);
-    showToast('Simulasi: Odo diset ke 99,650 KM (Warning status triggered)!', 'warning');
+    showToast('Simulasi: Odo diset ke 99,650 km (Mendekati jadwal servis)!', 'warning');
   });
   document.getElementById('btnSimOdoDue')?.addEventListener('click', () => {
     demoSimulator.setOdo(100500);
-    showToast('Simulasi: Odo diset ke 100,500 KM (DUE status triggered)!', 'warning');
+    showToast('Simulasi: Odo diset ke 100,500 km (Jatuh tempo servis)!', 'warning');
   });
 }
 
@@ -514,7 +498,7 @@ function openMaintenanceDrawer(focusKey = null) {
     setTimeout(() => {
       const card = document.getElementById(`card-${focusKey}`);
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 200);
+    }, 150);
   }
 }
 
@@ -523,7 +507,7 @@ function closeMaintenanceDrawer() {
 }
 
 function switchDrawerTab(tabId) {
-  document.querySelectorAll('.drawer-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === tabId));
 }
 
@@ -576,7 +560,7 @@ async function handleServiceFormSubmit(e) {
   renderMaintenanceCards();
   renderServiceHistory();
   renderDashboardHealth();
-  showToast('Service record berhasil dicatat & jadwal diperbarui!', 'success');
+  showToast('Catatan servis berhasil disimpan!', 'success');
 }
 
 async function handleCustomSettingSubmit(e) {
@@ -614,7 +598,7 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>⚡</span> <span>${message}</span>`;
+  toast.textContent = message;
   container.appendChild(toast);
 
   setTimeout(() => {
