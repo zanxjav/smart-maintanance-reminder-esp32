@@ -458,53 +458,16 @@ function showToast(message, type = 'info') {
 }
 
 /* ==========================================================================
-   PWA INSTALL & SERVICE WORKER REGISTRATION
+   SERVICE WORKER REGISTRATION (NATIVE PWA SUPPORT)
    ========================================================================== */
-let deferredPwaPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPwaPrompt = e;
-  const btn = document.getElementById('btnInstallPWA');
-  if (btn) {
-    btn.classList.add('visible');
-  }
-});
-
-window.addEventListener('appinstalled', () => {
-  deferredPwaPrompt = null;
-  const btn = document.getElementById('btnInstallPWA');
-  if (btn) btn.style.display = 'none';
-  showToast('Aplikasi Vehicle Monitor berhasil terpasang di HP/Laptop Anda!', 'success');
-});
-
-document.getElementById('btnInstallPWA')?.addEventListener('click', async () => {
-  if (deferredPwaPrompt) {
-    deferredPwaPrompt.prompt();
-    const { outcome } = await deferredPwaPrompt.userChoice;
-    if (outcome === 'accepted') {
-      showToast('Memasang aplikasi...', 'success');
-    }
-    deferredPwaPrompt = null;
-  } else {
-    // Guide for Android / iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIOS) {
-      showToast('Di Safari iPhone: Ketuk tombol Share (ikon kotak panah ke atas) lalu pilih "Add to Home Screen".', 'info');
-    } else {
-      showToast('Di Chrome/Browser: Ketuk menu titik tiga (⋮) di kanan atas lalu pilih "Install App" / "Tambahkan ke Layar Utama".', 'info');
-    }
-  }
-});
-
-// Register SW
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('[PWA] Service Worker Registered'))
-      .catch(err => console.warn('[PWA] Service Worker failed:', err));
+      .then(() => console.log('[PWA] Service Worker Active'))
+      .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
   });
 }
+
 
 
 
