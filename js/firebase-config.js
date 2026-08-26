@@ -1,19 +1,17 @@
 /**
  * FIREBASE CONFIGURATION
  * 
- * Replace placeholders below with your actual Firebase Project credentials.
- * If left as placeholders, the dashboard will automatically run in DEMO MODE
- * with full local state simulation, so no errors will occur in Live Server.
+ * Auto-configured from Firebase Project: greenhouse-firebase-56abd
  */
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAxPO-OEL2cnlQstspnjkyIq-3VOzYK8KM",
+  authDomain: "greenhouse-firebase-56abd.firebaseapp.com",
+  databaseURL: "https://greenhouse-firebase-56abd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "greenhouse-firebase-56abd",
+  storageBucket: "greenhouse-firebase-56abd.firebasestorage.app",
+  messagingSenderId: "347929965464",
+  appId: "1:347929965464:web:36e778ff71f8a370b431ed"
 };
 
 /**

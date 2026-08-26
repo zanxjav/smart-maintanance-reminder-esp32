@@ -58,18 +58,16 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMaintenanceReminders();
   });
 
-  // 4. ESP32 Direct WiFi Status Listener
-  subscribeConnectionStatus(({ connected, ip }) => {
-    updateConnectionBadge(connected, ip);
+  // 4. Firebase Status Listener
+  subscribeConnectionStatus(({ connected, mode, projectId }) => {
+    updateConnectionBadge(connected, mode, projectId);
     if (connected) {
       demoSimulator.stop();
-      showToast(`Terhubung langsung ke ESP32 (${ip})`, 'success');
-    } else {
-      demoSimulator.start();
+      showToast('Firebase Realtime Database Terhubung!', 'success');
     }
   });
 
-  // 5. Initialize Direct WiFi
+  // 5. Initialize Firebase
   initFirebaseService();
 });
 
@@ -425,13 +423,13 @@ async function handleServiceFormSubmit(e) {
   showToast('Catatan servis berhasil disimpan!', 'success');
 }
 
-function updateConnectionBadge(connected, ip) {
+function updateConnectionBadge(connected, mode, projectId) {
   const dot = document.getElementById('esp32Dot');
   const label = document.getElementById('esp32StatusLabel');
   if (dot && label) {
     if (connected) {
       dot.className = 'status-indicator-dot online';
-      label.textContent = `ESP32 (${ip})`;
+      label.textContent = 'Firebase Cloud';
     } else {
       dot.className = 'status-indicator-dot offline';
       label.textContent = 'Mode Simulasi';
@@ -441,24 +439,9 @@ function updateConnectionBadge(connected, ip) {
 
 function setupConnectionModal() {
   const btn = document.getElementById('btnEsp32Status');
-  const modal = document.getElementById('modalEsp32Config');
-  const form = document.getElementById('formEsp32Config');
-  const inputIp = document.getElementById('inputEsp32Ip');
-
   if (btn) {
     btn.addEventListener('click', () => {
-      if (inputIp) inputIp.value = getEsp32Ip();
-      modal?.classList.add('open');
-    });
-  }
-
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const newIp = inputIp?.value.trim() || 'vehicle.local';
-      setEsp32Ip(newIp);
-      closeAllModals();
-      showToast(`Menghubungkan ke ${newIp}...`, 'info');
+      showToast('Firebase Realtime Database aktif terhubung.', 'success');
     });
   }
 }

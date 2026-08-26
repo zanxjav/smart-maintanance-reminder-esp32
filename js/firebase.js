@@ -1,14 +1,16 @@
 /**
- * ESP32 DIRECT WIFI DATA LAYER (ZERO FIREBASE DEPENDENCY)
+ * FIREBASE REALTIME SERVICE (OFFICIAL MODULAR V10 SDK)
  * 
- * Direct, high-speed local WiFi communication between the Web Dashboard
- * and ESP32 via REST API endpoints (/api/telemetry, /api/speedlimit, /api/resettrip).
+ * Directly connected to Firebase Project: greenhouse-firebase-56abd
+ * Seamlessly synchronizes telemetry and settings between ESP32 and Web Dashboard.
  */
 
-let esp32Ip = localStorage.getItem('esp32_ip') || 'vehicle.local';
-let isConnectedToEsp32 = false;
-let pollingInterval = null;
-let pollFrequencyMs = 200; // 5 Hz ultra-smooth realtime telemetry
+import { firebaseConfig, isFirebaseConfigured } from './firebase-config.js';
+
+let app = null;
+let db = null;
+let isConnected = false;
+let fbDbModule = null;
 
 // Event listeners registry
 const listeners = {
@@ -21,124 +23,107 @@ const listeners = {
 };
 
 /**
- * Initialize Direct ESP32 WiFi Connection
+ * Initialize Firebase Realtime Database
  */
 export async function initFirebaseService() {
-  console.info("%c[ESP32 Direct WiFi] Memulai koneksi lokal berkecepatan tinggi ke ESP32...", "color: #3b82f6; font-weight: bold;");
-  
-  // Start polling
-  startEsp32Polling();
-  
-  return { status: 'DIRECT_WIFI', isConnected: isConnectedToEsp32, ip: esp32Ip };
+  if (!isFirebaseConfigured(firebaseConfig)) {
+    console.info("%c[Vehicle SCADA] Firebase config not set. Operating in Demo Mode.", "color: #3b82f6; font-weight: bold;");
+    isConnected = false;
+    dispatchLocalUpdate('connection', { connected: false, mode: 'DEMO' });
+    return { status: 'DEMO_MODE', isConnected: false };
+  }
+
+  try {
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js');
+    fbDbModule = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js');
+
+    app = initializeApp(firebaseConfig);
+    db = fbDbModule.getDatabase(app);
+    isConnected = true;
+    console.info("%c[Vehicle SCADA] Firebase Realtime Database TERHUBUNG!", "color: #10b981; font-weight: bold;");
+    dispatchLocalUpdate('connection', { connected: true, mode: 'FIREBASE', projectId: firebaseConfig.projectId });
+
+    // Setup active listeners once connected
+    setupRemoteListeners();
+
+    return { status: 'CONNECTED', isConnected: true, db };
+  } catch (err) {
+    console.warn("[Vehicle SCADA] Firebase connection error, fallback to Demo Mode:", err.message);
+    isConnected = false;
+    dispatchLocalUpdate('connection', { connected: false, mode: 'DEMO' });
+    return { status: 'DEMO_MODE', isConnected: false, error: err.message };
+  }
 }
 
 export function isFirebaseActive() {
-  return isConnectedToEsp32;
+  return isConnected;
 }
 
-export function getEsp32Ip() {
-  return esp32Ip;
-}
+function setupRemoteListeners() {
+  if (!isConnected || !db || !fbDbModule) return;
 
-export function setEsp32Ip(newIp) {
-  esp32Ip = newIp.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-  localStorage.setItem('esp32_ip', esp32Ip);
-  console.info(`[ESP32 Direct] Target IP diubah ke: ${esp32Ip}`);
-  
-  // Reconnect immediately
-  if (pollingInterval) clearInterval(pollingInterval);
-  startEsp32Polling();
-}
-
-/**
- * High-speed Telemetry Polling
- */
-function startEsp32Polling() {
-  const tryFetchTelemetry = async () => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
-
-      const url = `http://${esp32Ip}/api/telemetry`;
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const data = await res.json();
-        if (!isConnectedToEsp32) {
-          isConnectedToEsp32 = true;
-          console.info(`%c[ESP32 Direct] TERHUBUNG ke ESP32 (${esp32Ip})!`, "color: #10b981; font-weight: bold;");
-          dispatchLocalUpdate('connection', { connected: true, ip: esp32Ip });
-        }
+  // 1. Vehicle Telemetry Listener (/vehicle/current)
+  try {
+    const vehicleRef = fbDbModule.ref(db, 'vehicle/current');
+    fbDbModule.onValue(vehicleRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
         dispatchLocalUpdate('vehicle', data);
         if (data.speedLimit !== undefined) {
-          dispatchLocalUpdate('speedLimit', data.speedLimit);
+          dispatchLocalUpdate('speedLimit', Number(data.speedLimit));
         }
-      } else {
-        markDisconnected();
       }
-    } catch (e) {
-      markDisconnected();
-    }
-  };
+    }, (err) => {
+      console.error("Telemetry listener error:", err);
+    });
+  } catch (e) {
+    console.warn("Error setting vehicle listener:", e);
+  }
 
-  tryFetchTelemetry();
-  pollingInterval = setInterval(tryFetchTelemetry, pollFrequencyMs);
-}
-
-function markDisconnected() {
-  if (isConnectedToEsp32) {
-    isConnectedToEsp32 = false;
-    console.warn(`[ESP32 Direct] Terputus dari ESP32 (${esp32Ip}), beralih ke mode simulasi lokal.`);
-    dispatchLocalUpdate('connection', { connected: false, ip: esp32Ip });
+  // 2. Speed Limit Listener (/settings/speedLimit)
+  try {
+    const limitRef = fbDbModule.ref(db, 'settings/speedLimit');
+    fbDbModule.onValue(limitRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val !== null && val !== undefined) {
+        dispatchLocalUpdate('speedLimit', Number(val));
+      }
+    });
+  } catch (e) {
+    console.warn("Error setting speed limit listener:", e);
   }
 }
 
 /**
- * Subscribe to realtime vehicle telemetry
+ * Subscriptions
  */
 export function subscribeVehicleData(callback) {
   listeners.vehicle.push(callback);
 }
 
-/**
- * Subscribe to Speed Limit setting
- */
 export function subscribeSpeedLimit(callback) {
   listeners.speedLimit.push(callback);
 }
 
-/**
- * Subscribe to Maintenance Settings
- */
 export function subscribeMaintenanceSettings(callback) {
   listeners.settings.push(callback);
 }
 
-/**
- * Subscribe to Maintenance Statuses
- */
 export function subscribeMaintenanceStatus(callback) {
   listeners.maintenance.push(callback);
 }
 
-/**
- * Subscribe to Service History
- */
 export function subscribeServiceHistory(callback) {
   listeners.history.push(callback);
 }
 
-/**
- * Subscribe to ESP32 Connection Status (Connected / Simulation)
- */
 export function subscribeConnectionStatus(callback) {
   listeners.connection.push(callback);
-  callback({ connected: isConnectedToEsp32, ip: esp32Ip });
+  callback({ connected: isConnected, mode: isConnected ? 'FIREBASE' : 'DEMO' });
 }
 
 /**
- * Broadcast local demo updates to subscribers instantly
+ * Broadcast local or remote updates to subscribers
  */
 export function dispatchLocalUpdate(channel, data) {
   const cbs = listeners[channel];
@@ -150,55 +135,64 @@ export function dispatchLocalUpdate(channel, data) {
 }
 
 /**
- * Save Service Record to LocalStorage
- */
-export async function writeServiceRecord(record, updatedMaintenanceMap) {
-  return { success: true, local: true };
-}
-
-/**
- * Update Maintenance Settings
- */
-export async function writeMaintenanceSettings(settingsMap) {
-  return { success: true, local: true };
-}
-
-/**
- * Send Speed Limit to ESP32 directly via HTTP REST
+ * Write Speed Limit to Firebase Realtime Database
  */
 export async function writeSpeedLimit(speedLimitVal) {
-  if (isConnectedToEsp32) {
+  if (isConnected && db && fbDbModule) {
     try {
-      const url = `http://${esp32Ip}/api/speedlimit?val=${speedLimitVal}`;
-      const res = await fetch(url, { method: 'GET' });
-      if (res.ok) {
-        console.info(`[ESP32 Direct] Speed limit ${speedLimitVal} km/h berhasil dikirim ke ESP32!`);
-        return { success: true };
-      }
-    } catch (e) {
-      console.warn("[ESP32 Direct] Gagal mengirim speed limit ke ESP32:", e);
+      const limitRef = fbDbModule.ref(db, 'settings/speedLimit');
+      await fbDbModule.set(limitRef, Number(speedLimitVal));
+      console.info(`[Firebase] Speed limit ${speedLimitVal} km/h berhasil disimpan ke Firebase.`);
+      return { success: true };
+    } catch (err) {
+      console.error("[Firebase] Gagal update speed limit:", err);
     }
   }
   return { success: true, local: true };
 }
 
 /**
- * Reset Trip Meter on ESP32 directly via HTTP REST
+ * Reset Trip Meter in Firebase
  */
 export async function writeResetTrip() {
-  if (isConnectedToEsp32) {
+  if (isConnected && db && fbDbModule) {
     try {
-      const url = `http://${esp32Ip}/api/resettrip`;
-      const res = await fetch(url, { method: 'GET' });
-      if (res.ok) {
-        console.info("[ESP32 Direct] Reset trip berhasil dikirim ke ESP32!");
-        return { success: true };
-      }
-    } catch (e) {
-      console.warn("[ESP32 Direct] Gagal reset trip:", e);
+      const tripRef = fbDbModule.ref(db, 'vehicle/current/trip');
+      await fbDbModule.set(tripRef, 0.0);
+      return { success: true };
+    } catch (err) {
+      console.error("[Firebase] Gagal reset trip:", err);
     }
   }
   return { success: true, local: true };
 }
 
+/**
+ * Maintenance & Service History persistence
+ */
+export async function writeServiceRecord(record, updatedMaintenanceMap) {
+  if (isConnected && db && fbDbModule) {
+    try {
+      const historyListRef = fbDbModule.ref(db, 'history');
+      const newRecordRef = fbDbModule.push(historyListRef);
+      await fbDbModule.set(newRecordRef, record);
+      return { success: true, id: newRecordRef.key };
+    } catch (err) {
+      console.error("Firebase writeServiceRecord error:", err);
+    }
+  }
+  return { success: true, local: true };
+}
 
+export async function writeMaintenanceSettings(settingsMap) {
+  if (isConnected && db && fbDbModule) {
+    try {
+      const settingsRef = fbDbModule.ref(db, 'settings/maintenance');
+      await fbDbModule.set(settingsRef, settingsMap);
+      return { success: true };
+    } catch (err) {
+      console.error("Firebase writeMaintenanceSettings error:", err);
+    }
+  }
+  return { success: true, local: true };
+}
