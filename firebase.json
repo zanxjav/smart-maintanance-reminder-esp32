@@ -4,10 +4,12 @@
     "ignore": [
       "firebase.json",
       ".firebaserc",
-      "**/.*",
-      "**/node_modules/**",
+      ".git/**",
+      ".gitignore",
       "firmware/**",
-      "vehicle-monitor.zip"
+      "*.zip",
+      "**/.*",
+      "node_modules/**"
     ],
     "headers": [
       {
