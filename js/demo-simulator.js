@@ -5,7 +5,7 @@
  * and instant responsive updates matching the dashboard overview.
  */
 
-import { dispatchLocalUpdate } from './firebase.js';
+import { dispatchLocalUpdate } from './telemetry-service.js';
 import { maintenanceEngine } from './maintenance-engine.js';
 
 class DemoSimulator {

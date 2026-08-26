@@ -34,9 +34,9 @@
       </div>
 
       <div class="nav-right">
-        <button class="connection-status-btn" id="btnEsp32Status" aria-label="Status Koneksi Firebase" title="Status Firebase Cloud">
+        <button class="connection-status-btn" id="btnEsp32Status" aria-label="Status Sistem" title="Status Telemetri">
           <span class="status-indicator-dot online" id="esp32Dot"></span>
-          <span class="status-indicator-label" id="esp32StatusLabel">Firebase Cloud</span>
+          <span class="status-indicator-label" id="esp32StatusLabel">Live Telemetry</span>
         </button>
 
         <button class="icon-btn notification-btn" id="btnNotifications" aria-label="Notifications">
@@ -393,7 +393,7 @@
       <form id="formSpeedLimit">
         <div class="modal-body">
           <p style="font-size: 0.85rem; color: var(--text-muted);">
-            Tentukan ambang batas kecepatan. Nilai ini akan disinkronkan ke Firebase dan memicu alarm ESP32 jika kecepatan mobil melampaui limit.
+            Tentukan ambang batas kecepatan. Sistem akan memicu alarm dan indikator visual jika kecepatan kendaraan melampaui batas aman.
           </p>
 
           <div class="limiter-slider-box">

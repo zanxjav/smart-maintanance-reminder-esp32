@@ -6,7 +6,7 @@
  * progress bar percentages, service recording, and local persistence.
  */
 
-import { writeServiceRecord, writeMaintenanceSettings, dispatchLocalUpdate } from './firebase.js';
+import { writeServiceRecord, writeMaintenanceSettings, dispatchLocalUpdate } from './telemetry-service.js';
 
 // Default initial catalog
 export const DEFAULT_MAINTENANCE_SETTINGS = {
@@ -453,7 +453,7 @@ class MaintenanceEngine {
     this.saveLocal('scada_maintenance_state', this.state);
     this.recalculateAllStatuses();
 
-    // 3. Write to Firebase if active
+    // 3. Persist service record & broadcast update
     await writeServiceRecord(historyItem, updatedStateMap);
     dispatchLocalUpdate('history', this.history);
 

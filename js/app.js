@@ -1,22 +1,18 @@
 /**
- * VEHICLE MONITOR - APP CONTROLLER (DIRECT ESP32 WIFI + ULTRA SMOOTH 60FPS)
+ * VEHICLE MONITOR - APP CONTROLLER (ULTRA SMOOTH 60FPS)
  * 
  * High-performance, lightweight orchestrator for the Vehicle Monitor Dashboard.
  */
 
 import { 
-  initFirebaseService, 
   subscribeVehicleData, 
   subscribeSpeedLimit, 
   subscribeMaintenanceStatus, 
   subscribeServiceHistory, 
   subscribeConnectionStatus,
   writeSpeedLimit, 
-  writeResetTrip,
-  setEsp32Ip,
-  getEsp32Ip,
-  isFirebaseActive 
-} from './firebase.js';
+  writeResetTrip 
+} from './telemetry-service.js';
 import { maintenanceEngine } from './maintenance-engine.js';
 import { demoSimulator } from './demo-simulator.js';
 
@@ -35,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   populateServiceModalDropdown();
   renderMaintenanceReminders();
 
-  // 2. Start Telemetry simulation by default until real ESP32 connects
+  // 2. Start Realtime Telemetry Simulation Engine
   demoSimulator.start();
 
   // 3. Telemetry Subscriptions
@@ -58,17 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMaintenanceReminders();
   });
 
-  // 4. Firebase Status Listener
-  subscribeConnectionStatus(({ connected, mode, projectId }) => {
-    updateConnectionBadge(connected, mode, projectId);
-    if (connected) {
-      demoSimulator.stop();
-      showToast('Firebase Realtime Database Terhubung!', 'success');
-    }
+  // 4. Connection / Status Listener
+  subscribeConnectionStatus((status) => {
+    updateConnectionBadge(status.connected);
   });
-
-  // 5. Initialize Firebase
-  initFirebaseService();
 });
 
 /* ==========================================================================
@@ -423,16 +412,16 @@ async function handleServiceFormSubmit(e) {
   showToast('Catatan servis berhasil disimpan!', 'success');
 }
 
-function updateConnectionBadge(connected, mode, projectId) {
+function updateConnectionBadge(connected) {
   const dot = document.getElementById('esp32Dot');
   const label = document.getElementById('esp32StatusLabel');
   if (dot && label) {
     if (connected) {
       dot.className = 'status-indicator-dot online';
-      label.textContent = 'Firebase Cloud';
+      label.textContent = 'Live Telemetry';
     } else {
       dot.className = 'status-indicator-dot offline';
-      label.textContent = 'Mode Simulasi';
+      label.textContent = 'Standby';
     }
   }
 }
@@ -441,7 +430,7 @@ function setupConnectionModal() {
   const btn = document.getElementById('btnEsp32Status');
   if (btn) {
     btn.addEventListener('click', () => {
-      showToast('Firebase Realtime Database aktif terhubung.', 'success');
+      showToast('Sistem Telemetri Kendaraan SCADA Aktif.', 'info');
     });
   }
 }
