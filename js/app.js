@@ -1,7 +1,7 @@
 /**
- * VEHICLE MONITOR - APP CONTROLLER
+ * VEHICLE MONITOR - APP CONTROLLER (SUPER SMOOTH 60FPS)
  * 
- * Clean, lightweight orchestrator for the Vehicle Monitor Dashboard.
+ * High-performance, lightweight orchestrator for the Vehicle Monitor Dashboard.
  */
 
 import { initFirebaseService, subscribeVehicleData, subscribeSpeedLimit, subscribeMaintenanceStatus, subscribeServiceHistory, writeSpeedLimit, isFirebaseActive } from './firebase.js';
@@ -14,20 +14,22 @@ let currentOdo = 97128;
 let currentTrip = 128.6;
 let currentStatus = "Normal";
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. Instant Synchronous UI Bootstrapping (Zero Lag)
   initClock();
   setupUIEvents();
   setupSpeedLimiterModal();
+  populateServiceModalDropdown();
+  renderMaintenanceReminders();
 
-  // Initialize Firebase or Fallback to Demo Mode
-  const initResult = await initFirebaseService();
+  // 2. Start Telemetry simulation immediately
+  demoSimulator.start();
 
-  // Subscribe to vehicle data
+  // 3. Subscriptions (Immediate Local Event Bus + Background Remote Sync)
   subscribeVehicleData((data) => {
     handleVehicleDataUpdate(data);
   });
 
-  // Subscribe to speed limit
   subscribeSpeedLimit((limit) => {
     if (limit !== null && limit !== undefined) {
       currentSpeedLimit = Number(limit);
@@ -35,24 +37,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Subscribe to maintenance updates
   subscribeMaintenanceStatus(() => {
     renderMaintenanceReminders();
   });
 
-  // Subscribe to service history
   subscribeServiceHistory(() => {
     renderMaintenanceReminders();
   });
 
-  // Start simulation if in demo mode
-  if (!isFirebaseActive()) {
-    demoSimulator.start();
-  }
-
-  // Initial renders
-  renderMaintenanceReminders();
-  populateServiceModalDropdown();
+  // 4. Background Firebase Init (Doesn't block UI)
+  initFirebaseService().then(() => {
+    if (isFirebaseActive()) {
+      demoSimulator.stop();
+    }
+  }).catch(e => console.warn("Firebase fallback:", e));
 });
 
 /* ==========================================================================
@@ -77,8 +75,12 @@ function initClock() {
 }
 
 /* ==========================================================================
-   TELEMETRY UPDATES
+   SUPER SMOOTH TELEMETRY UPDATES
    ========================================================================== */
+let lastDisplayedSpeed = -1;
+let lastDisplayedOdo = -1;
+let lastDisplayedTrip = -1;
+
 function handleVehicleDataUpdate(data) {
   if (!data) return;
 
@@ -87,51 +89,61 @@ function handleVehicleDataUpdate(data) {
   currentTrip = Number(data.trip) || currentTrip;
   currentStatus = data.status || currentStatus;
 
-  // DOM elements
-  const speedValEl = document.getElementById('valSpeed');
-  const speedLargeEl = document.getElementById('valSpeedLarge');
-  if (speedValEl) speedValEl.textContent = currentSpeed;
-  if (speedLargeEl) speedLargeEl.textContent = currentSpeed;
+  // Cached DOM writes for peak performance
+  const roundedSpeed = Math.round(currentSpeed);
+  if (roundedSpeed !== lastDisplayedSpeed) {
+    lastDisplayedSpeed = roundedSpeed;
+    const speedValEl = document.getElementById('valSpeed');
+    const speedLargeEl = document.getElementById('valSpeedLarge');
+    if (speedValEl) speedValEl.textContent = roundedSpeed;
+    if (speedLargeEl) speedLargeEl.textContent = roundedSpeed;
 
-  const odoEl = document.getElementById('valOdo');
-  if (odoEl) odoEl.textContent = maintenanceEngine.formatNumber(currentOdo);
+    // Speed Gauge Arc calculation (Scale: 0 to 80 km/h)
+    const maxScale = 80;
+    const clampedSpeed = Math.min(maxScale, Math.max(0, currentSpeed));
+    const arcLength = 236; // Radius 75 semi-arc length
+    const offset = arcLength - (clampedSpeed / maxScale) * arcLength;
 
-  const tripEl = document.getElementById('valTrip');
-  if (tripEl) tripEl.textContent = Number(currentTrip).toFixed(1);
+    const gaugeFill = document.getElementById('speedGaugeFill');
+    if (gaugeFill) {
+      gaugeFill.style.strokeDashoffset = offset;
+      if (currentSpeed > currentSpeedLimit) {
+        gaugeFill.style.stroke = '#ef4444';
+        if (speedValEl) speedValEl.style.color = '#ef4444';
+      } else {
+        gaugeFill.style.stroke = '#2563eb';
+        if (speedValEl) speedValEl.style.color = '#0f172a';
+      }
+    }
 
-  // Speed Gauge Arc calculation (Scale: 0 to 80 km/h)
-  const maxScale = 80;
-  const clampedSpeed = Math.min(maxScale, Math.max(0, currentSpeed));
-  const arcLength = 236; // Circumference of radius 75 semi-arc
-  const offset = arcLength - (clampedSpeed / maxScale) * arcLength;
+    // Over-speed alert notification
+    const actDot = document.getElementById('recentActivityDot');
+    const actTitle = document.getElementById('recentActivityTitle');
+    const actSub = document.getElementById('recentActivitySub');
+    const actTime = document.getElementById('recentActivityTime');
 
-  const gaugeFill = document.getElementById('speedGaugeFill');
-  if (gaugeFill) {
-    gaugeFill.style.strokeDashoffset = offset;
-    // Over limit styling
     if (currentSpeed > currentSpeedLimit) {
-      gaugeFill.style.stroke = '#ef4444';
-      if (speedValEl) speedValEl.style.color = '#ef4444';
-    } else {
-      gaugeFill.style.stroke = '#2563eb';
-      if (speedValEl) speedValEl.style.color = '#0f172a';
+      if (actDot) actDot.className = 'activity-dot red';
+      if (actTitle) actTitle.textContent = 'Speed Alert';
+      if (actSub) actSub.textContent = `Overspeed: ${roundedSpeed} km/h`;
+      if (actTime) actTime.textContent = 'Just now';
     }
   }
 
-  // Update Recent Activity if over-speed
-  const actDot = document.getElementById('recentActivityDot');
-  const actTitle = document.getElementById('recentActivityTitle');
-  const actSub = document.getElementById('recentActivitySub');
-  const actTime = document.getElementById('recentActivityTime');
-
-  if (currentSpeed > currentSpeedLimit) {
-    if (actDot) actDot.className = 'activity-dot red';
-    if (actTitle) actTitle.textContent = 'Speed Alert';
-    if (actSub) actSub.textContent = `Overspeed: ${currentSpeed} km/h`;
-    if (actTime) actTime.textContent = 'Just now';
+  const roundedOdo = Math.round(currentOdo);
+  if (roundedOdo !== lastDisplayedOdo) {
+    lastDisplayedOdo = roundedOdo;
+    const odoEl = document.getElementById('valOdo');
+    if (odoEl) odoEl.textContent = maintenanceEngine.formatNumber(roundedOdo);
+    maintenanceEngine.setCurrentOdo(roundedOdo);
   }
 
-  maintenanceEngine.setCurrentOdo(currentOdo);
+  const roundedTrip = Number(currentTrip).toFixed(1);
+  if (roundedTrip !== lastDisplayedTrip) {
+    lastDisplayedTrip = roundedTrip;
+    const tripEl = document.getElementById('valTrip');
+    if (tripEl) tripEl.textContent = roundedTrip;
+  }
 }
 
 function updateSpeedLimitDisplay(limit) {
@@ -146,7 +158,7 @@ function renderMaintenanceReminders() {
   const allCards = maintenanceEngine.getAllCardsData();
   const summary = maintenanceEngine.recalculateAllStatuses();
 
-  // Status badge
+  // 1. Status badge in header / 2x2 grid
   const statusBadge = document.getElementById('valVehicleStatus');
   if (statusBadge) {
     if (summary.due > 0) {
@@ -164,27 +176,65 @@ function renderMaintenanceReminders() {
     }
   }
 
-  // Populate list in Full Maintenance Manager Modal
+  // 2. Dynamic Update of Dashboard Main Cards (Oli Mesin, Transmisi, Coolant)
+  const previewKeys = ['oil_engine', 'transmission_oil', 'coolant'];
+  previewKeys.forEach(key => {
+    const item = allCards.find(c => c.key === key);
+    if (!item) return;
+
+    const nameEl = document.getElementById(`name-${key}`);
+    const intEl = document.getElementById(`interval-${key}`);
+    const remEl = document.getElementById(`rem-${key}`);
+    const barEl = document.getElementById(`bar-${key}`);
+    const pctEl = document.getElementById(`pct-${key}`);
+
+    if (nameEl) nameEl.textContent = item.name;
+    if (intEl) intEl.textContent = `Setiap ${maintenanceEngine.formatNumber(item.intervalKm)} km`;
+    if (remEl) {
+      remEl.textContent = item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} km lagi` : 'Jatuh tempo';
+    }
+    if (pctEl) pctEl.textContent = `${item.percentUsed}%`;
+    if (barEl) {
+      barEl.style.width = `${item.percentUsed}%`;
+      if (item.status === 'DUE') {
+        barEl.style.background = '#ef4444';
+      } else if (item.status === 'WARNING') {
+        barEl.style.background = '#f59e0b';
+      } else {
+        barEl.style.background = '#10b981';
+      }
+    }
+  });
+
+  // 3. Populate list in Full Maintenance Manager Modal
   const fullContainer = document.getElementById('fullMaintenanceListContainer');
   if (fullContainer) {
     fullContainer.innerHTML = allCards.map(item => `
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.85rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+      <div class="modal-service-card" data-key="${item.key}" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.9rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         <div>
-          <div style="font-weight: 700; font-size: 0.9rem; color: #0f172a;">${item.name}</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Interval: ${maintenanceEngine.formatNumber(item.intervalKm)} KM / ${item.intervalMonths} Bulan</div>
-          <div style="font-size: 0.75rem; color: #64748b;">Next: ${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</div>
+          <div style="font-weight: 700; font-size: 0.92rem; color: #0f172a;">${item.name}</div>
+          <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Interval: ${maintenanceEngine.formatNumber(item.intervalKm)} KM / ${item.intervalMonths} Bulan</div>
+          <div style="font-size: 0.76rem; color: #64748b;">Berikutnya: ${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</div>
         </div>
         <div style="text-align: right;">
-          <span style="font-weight: 700; font-size: 0.85rem; color: ${item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981')};">${item.status}</span>
-          <div style="font-size: 0.75rem; color: #64748b;">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : 'Jatuh tempo'}</div>
+          <span style="font-weight: 700; font-size: 0.85rem; padding: 0.2rem 0.55rem; border-radius: 6px; background: ${item.status === 'DUE' ? '#fef2f2' : (item.status === 'WARNING' ? '#fffbeb' : '#ecfdf5')}; color: ${item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981')};">${item.status}</span>
+          <div style="font-size: 0.76rem; font-weight: 600; color: #334155; margin-top: 4px;">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : 'Jatuh tempo'}</div>
         </div>
       </div>
     `).join('');
+
+    // Attach click to open service log
+    fullContainer.querySelectorAll('.modal-service-card').forEach(card => {
+      card.addEventListener('click', () => {
+        closeAllModals();
+        openServiceModal(card.dataset.key);
+      });
+    });
   }
 }
 
 /* ==========================================================================
-   SPEED LIMITER MODAL CONTROLLER
+   SPEED LIMITER CONTROLLER
    ========================================================================== */
 function setupSpeedLimiterModal() {
   const modal = document.getElementById('modalSpeedLimit');
@@ -231,7 +281,7 @@ function setupSpeedLimiterModal() {
       const newLimit = Number(slider.value);
       currentSpeedLimit = newLimit;
       demoSimulator.setSpeedLimit(newLimit);
-      await writeSpeedLimit(newLimit);
+      writeSpeedLimit(newLimit);
       updateSpeedLimitDisplay(newLimit);
       closeAllModals();
       showToast(`Speed limit diset ke ${newLimit} km/h`, 'success');
@@ -241,7 +291,7 @@ function setupSpeedLimiterModal() {
 }
 
 /* ==========================================================================
-   UI EVENTS & BOTTOM TAB BAR
+   UI EVENTS & BOTTOM TAB BAR (SUPER FLUID)
    ========================================================================== */
 function setupUIEvents() {
   // Bottom Tab Navigation
@@ -254,11 +304,11 @@ function setupUIEvents() {
       const tabName = tab.dataset.tab;
       if (tabName === 'trip') {
         demoSimulator.resetTrip();
-        showToast('Trip meter direset ke 0.0 km', 'success');
+        showToast('Trip meter berhasil direset ke 0.0 km', 'success');
         setTimeout(() => {
           document.getElementById('tabNavDashboard')?.classList.add('active');
           tab.classList.remove('active');
-        }, 1000);
+        }, 1200);
       } else if (tabName === 'maintenance') {
         openMaintenanceManager();
       } else if (tabName === 'settings') {
@@ -295,11 +345,16 @@ function setupUIEvents() {
 
   // Notifications button
   document.getElementById('btnNotifications')?.addEventListener('click', () => {
-    showToast('Semua sistem kendaraan terpantau normal.', 'success');
+    showToast('Semua sensor dan sistem kendaraan normal terkoneksi.', 'success');
   });
 
   document.getElementById('btnMenu')?.addEventListener('click', () => {
     openMaintenanceManager();
+  });
+
+  // Recent Activity View All
+  document.getElementById('btnViewAllActivity')?.addEventListener('click', () => {
+    showToast('Tidak ada alert aktif lainnya.', 'info');
   });
 }
 
@@ -360,7 +415,8 @@ function showToast(message, type = 'info') {
 
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.3s';
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+    toast.style.transform = 'translateY(10px) scale(0.95)';
+    setTimeout(() => toast.remove(), 250);
+  }, 2800);
 }
+

@@ -1,8 +1,8 @@
 /**
- * DEMO SIMULATOR & TELEMETRY ENGINE
+ * DEMO SIMULATOR & REALTIME TELEMETRY ENGINE
  * 
- * Provides smooth, realistic telemetry matching the dashboard overview
- * (Speed 42 km/h, Trip 128.6 km, Odometer 97,128 km, Speed limit 60 km/h).
+ * Provides ultra-smooth 60fps telemetry interpolation, realistic cruising physics,
+ * and instant responsive updates matching the dashboard overview.
  */
 
 import { dispatchLocalUpdate } from './firebase.js';
@@ -11,6 +11,7 @@ import { maintenanceEngine } from './maintenance-engine.js';
 class DemoSimulator {
   constructor() {
     this.speed = 42;
+    this.targetSpeed = 42;
     this.odo = 97128.0;
     this.trip = 128.6;
     this.speedLimit = 60;
@@ -18,46 +19,70 @@ class DemoSimulator {
     this.esp32Status = "Online";
     this.vehicleStatus = "Normal";
     this.isCruising = true;
-    this.intervalTimer = null;
+    this.rafId = null;
+    this.cruisingInterval = null;
+    this.lastTime = performance.now();
     
     maintenanceEngine.setCurrentOdo(this.odo);
   }
 
   start() {
-    if (this.intervalTimer) clearInterval(this.intervalTimer);
+    this.stop();
 
-    // Subtle realtime telemetry fluctuation every 2 seconds
-    this.intervalTimer = setInterval(() => {
-      this.tick();
+    // Subtle cruise speed adjustments every 2.5s for natural behavior
+    this.cruisingInterval = setInterval(() => {
+      if (this.isCruising) {
+        // Natural speed variation around 38 - 46 km/h
+        const target = 42 + (Math.sin(Date.now() / 1500) * 3.5) + ((Math.random() - 0.5) * 2);
+        this.targetSpeed = Math.max(0, Math.min(140, target));
+      }
     }, 2000);
+
+    // 60FPS fluid physics loop
+    const loop = (now) => {
+      const dt = Math.min((now - this.lastTime) / 1000, 0.1);
+      this.lastTime = now;
+
+      // Smooth exponential lerp towards target speed
+      if (this.isCruising) {
+        this.speed += (this.targetSpeed - this.speed) * Math.min(dt * 3.5, 1);
+        
+        // Progressively advance trip & odo
+        const distanceKm = (this.speed / 3600) * dt;
+        this.trip += distanceKm;
+        this.odo += distanceKm;
+      }
+
+      this.broadcastTelemetry();
+      this.rafId = requestAnimationFrame(loop);
+    };
+
+    this.lastTime = performance.now();
+    this.rafId = requestAnimationFrame(loop);
   }
 
   stop() {
-    if (this.intervalTimer) {
-      clearInterval(this.intervalTimer);
-      this.intervalTimer = null;
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    if (this.cruisingInterval) {
+      clearInterval(this.cruisingInterval);
+      this.cruisingInterval = null;
     }
   }
 
-  tick() {
-    if (this.isCruising) {
-      // Gentle cruise fluctuation around 40-44 km/h
-      const variation = (Math.random() - 0.48) * 2;
-      this.speed = Math.max(0, Math.min(140, Math.round(this.speed + variation)));
-      
-      const distanceInc = (this.speed / 3600) * 2;
-      this.trip = parseFloat((this.trip + distanceInc).toFixed(1));
-      this.odo = Math.round(this.odo + distanceInc);
-    }
-
+  broadcastTelemetry() {
+    const roundedSpeed = Math.round(this.speed * 10) / 10;
     const now = new Date();
     const timeStr = now.toTimeString().split(' ')[0];
     const dateStr = now.toISOString().split('T')[0];
 
     const telemetry = {
-      speed: this.speed,
+      speed: roundedSpeed,
+      rawSpeed: this.speed,
       odo: Math.round(this.odo),
-      trip: this.trip,
+      trip: parseFloat(this.trip.toFixed(1)),
       speedLimit: this.speedLimit,
       gps: this.gpsStatus,
       esp32: this.esp32Status,
@@ -69,30 +94,30 @@ class DemoSimulator {
 
     maintenanceEngine.setCurrentOdo(this.odo);
     dispatchLocalUpdate('vehicle', telemetry);
-    dispatchLocalUpdate('speedLimit', this.speedLimit);
   }
 
   setSpeed(val) {
+    this.targetSpeed = Number(val);
     this.speed = Number(val);
-    this.tick();
+    this.broadcastTelemetry();
   }
 
   setSpeedLimit(val) {
     this.speedLimit = Number(val);
     dispatchLocalUpdate('speedLimit', this.speedLimit);
-    this.tick();
   }
 
   setOdo(val) {
     this.odo = Number(val);
     maintenanceEngine.setCurrentOdo(this.odo);
-    this.tick();
+    this.broadcastTelemetry();
   }
 
   resetTrip() {
     this.trip = 0.0;
-    this.tick();
+    this.broadcastTelemetry();
   }
 }
 
 export const demoSimulator = new DemoSimulator();
+
