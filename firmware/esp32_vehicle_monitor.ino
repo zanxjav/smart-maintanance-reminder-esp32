@@ -38,13 +38,13 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 // 3. PARAMETER & TIMING NON-BLOCKING
 // ============================================================
 #define DEFAULT_SPEED_LIMIT      60.0
-#define INITIAL_ODO_KM           97000.0
+#define INITIAL_ODO_KM           97248.0
 #define UTC_OFFSET_HOURS         7
 
 #define OLED_UPDATE_INTERVAL_MS  100     // Refresh rate OLED 10 FPS
-#define LED_BLINK_INTERVAL_MS    300
+#define LED_BLINK_INTERVAL_MS    175
 #define WEB_SEND_INTERVAL_MS     1000    // Kirim data ke Web tiap 1 detik
-#define WEB_SYNC_INTERVAL_MS     3000    // Cek limit dari web tiap 3 detik
+#define WEB_SYNC_INTERVAL_MS     3000    // Cek limit & perintah web tiap 3 detik
 
 #define ODO_SAVE_DISTANCE_KM     0.5
 #define ODO_SAVE_INTERVAL_MS     60000UL
@@ -67,6 +67,8 @@ double tripKm          = 0.0;
 double currentSpeed    = 0.0;
 bool   gpsFix          = false;
 bool   overSpeedActive = false;
+
+// State tambahan khusus kendali Flash Test LED Oren (Pin 4)
 bool   flashTestActive = false;
 unsigned long flashTestEndMs = 0;
 
@@ -258,7 +260,7 @@ void sendTelemetryToWeb() {
     json += "\"speedLimit\":" + String((int)speedLimit) + ",";
     json += "\"gps\":\"" + String(gpsFix ? "Connected" : "No Signal") + "\",";
     json += "\"esp32\":\"Online\",";
-    json += "\"status\":\"" + String(overSpeedActive ? "Warning" : "Normal") + "\",";
+    json += "\"status\":\"" + String((overSpeedActive || flashTestActive) ? "Warning" : "Normal") + "\",";
     json += "\"date\":\"" + String(dateStr) + "\",";
     json += "\"time\":\"" + String(timeStr) + "\",";
     json += "\"lastUpdate\":\"" + String(timeStr) + "\",";
@@ -271,14 +273,14 @@ void sendTelemetryToWeb() {
     http.end();
 }
 
-void syncCommandsFromWeb() {
+void syncSpeedLimitFromWeb() {
     if (wifiState != WIFI_CONNECTED) return;
 
     unsigned long now = millis();
     if (now - lastWebSyncMs < WEB_SYNC_INTERVAL_MS) return;
     lastWebSyncMs = now;
 
-    // 1. Sync Speed Limit dari Web
+    // 1. Sync Speed Limit
     HTTPClient http;
     String url = String(FIREBASE_HOST) + "/settings/speedLimit.json";
     
@@ -297,7 +299,7 @@ void syncCommandsFromWeb() {
     }
     http.end();
 
-    // 2. Sync Flash Test Command (Uji Coba Kedipan Lampu Oren Pin 4)
+    // 2. Sync Kendali Flash Test LED Oren (Pin 4)
     String flashUrl = String(FIREBASE_HOST) + "/commands/flashTest.json";
     http.begin(firebaseClient, flashUrl);
     http.setReuse(true);
@@ -316,7 +318,7 @@ void syncCommandsFromWeb() {
                     if (duration <= 0 || duration > 30000) duration = 5000;
                 }
                 flashTestEndMs = millis() + duration;
-                Serial.printf("[WEB] Flash Test ACTIVE: %d ms (Pin 4 Orange LED)\n", duration);
+                Serial.printf("[WEB] Flash Test STARTED: %d ms (Pin 4 Orange LED)\n", duration);
             }
         } else if (payload.indexOf("\"active\":false") >= 0 || payload.indexOf("\"active\": false") >= 0) {
             if (flashTestActive) {
@@ -428,7 +430,7 @@ void updateWarning() {
 void updateLED() {
     bool isWarning = overSpeedActive;
 
-    // Cek status Flash Test mandiri
+    // Kendali non-blocking untuk Flash Test LED Oren
     if (flashTestActive) {
         if (millis() < flashTestEndMs) {
             isWarning = true;
@@ -443,7 +445,6 @@ void updateLED() {
         digitalWrite(ORANGE_LED_PIN, LOW);
         return;
     }
-
     digitalWrite(GREEN_LED_PIN, LOW);
     if (millis() - lastBlinkMs >= LED_BLINK_INTERVAL_MS) {
         lastBlinkMs = millis();
@@ -497,10 +498,8 @@ void updateOLED() {
     display.setCursor(SCREEN_WIDTH - w, 0);
     display.print(timeStr);
 
-    // Kecepatan / Flash Test Display
-    if (flashTestActive && !blinkState) {
-        printCentered("FLASH", 16, 3);
-    } else if (!(overSpeedActive && !blinkState)) {
+    // Kecepatan
+    if (!(overSpeedActive && !blinkState)) {
         char speedStr[6];
         if (gpsFix) snprintf(speedStr, sizeof(speedStr), "%d", (int)(currentSpeed + 0.5));
         else snprintf(speedStr, sizeof(speedStr), "--");
@@ -565,7 +564,7 @@ void loop() {
     updateOLED();
 
     sendTelemetryToWeb();
-    syncCommandsFromWeb();
+    syncSpeedLimitFromWeb();
 
     yield();
 }
