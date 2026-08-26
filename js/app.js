@@ -119,8 +119,8 @@ function handleVehicleDataUpdate(data) {
         gaugeFill.style.stroke = '#ef4444';
         if (speedValEl) speedValEl.style.color = '#ef4444';
       } else {
-        gaugeFill.style.stroke = '#2563eb';
-        if (speedValEl) speedValEl.style.color = '#0f172a';
+        gaugeFill.style.stroke = '#38bdf8';
+        if (speedValEl) speedValEl.style.color = '#ffffff';
       }
     }
 
@@ -139,18 +139,19 @@ function handleVehicleDataUpdate(data) {
   }
 
   const roundedOdo = Math.round(currentOdo);
-  if (roundedOdo !== lastDisplayedOdo) {
+  if (roundedOdo !== lastDisplayedOdo && roundedOdo > 0) {
     lastDisplayedOdo = roundedOdo;
     const odoEl = document.getElementById('valOdo');
     if (odoEl) odoEl.textContent = maintenanceEngine.formatNumber(roundedOdo);
     maintenanceEngine.setCurrentOdo(roundedOdo);
   }
 
-  const roundedTrip = Number(currentTrip).toFixed(1);
-  if (roundedTrip !== lastDisplayedTrip) {
-    lastDisplayedTrip = roundedTrip;
+  const tripNum = Number(currentTrip) || 0;
+  const formattedTrip = tripNum < 10 ? tripNum.toFixed(2) : tripNum.toFixed(1);
+  if (formattedTrip !== lastDisplayedTrip) {
+    lastDisplayedTrip = formattedTrip;
     const tripEl = document.getElementById('valTrip');
-    if (tripEl) tripEl.textContent = roundedTrip;
+    if (tripEl) tripEl.textContent = formattedTrip;
   }
 }
 

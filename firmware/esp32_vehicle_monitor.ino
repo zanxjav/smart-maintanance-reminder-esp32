@@ -39,25 +39,24 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 // ============================================================
 #define DEFAULT_SPEED_LIMIT      60.0
 #define INITIAL_ODO_KM           97000.0
-#define MIN_MOVE_METERS          2.0
 #define UTC_OFFSET_HOURS         7
 
 #define OLED_UPDATE_INTERVAL_MS  100     // Refresh rate OLED 10 FPS
 #define LED_BLINK_INTERVAL_MS    300
 #define WEB_SEND_INTERVAL_MS     1000    // Kirim data ke Web tiap 1 detik
-#define WEB_SYNC_INTERVAL_MS     2500    // Cek limit dari web tiap 2.5 detik
-#define DEBUG_PRINT_INTERVAL_MS  1000
+#define WEB_SYNC_INTERVAL_MS     3000    // Cek limit dari web tiap 3 detik
 
 #define ODO_SAVE_DISTANCE_KM     0.5
 #define ODO_SAVE_INTERVAL_MS     60000UL
 
 // ============================================================
-// 4. OBJEK GLOBAL
+// 4. OBJEK GLOBAL & CLIENT KONEKSI CEPAT (PERSISTENT TLS)
 // ============================================================
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(1);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Preferences preferences;
+WiFiClientSecure firebaseClient;
 
 // ============================================================
 // 5. STATE GLOBAL
@@ -76,10 +75,12 @@ bool   hasLastPosition = false;
 double odoAtLastSave = INITIAL_ODO_KM;
 unsigned long lastOdoSaveMs = 0;
 
-unsigned long lastOledUpdateMs = 0;
-unsigned long lastBlinkMs      = 0;
-unsigned long lastWebSendMs    = 0;
-unsigned long lastWebSyncMs    = 0;
+unsigned long lastOledUpdateMs  = 0;
+unsigned long lastBlinkMs       = 0;
+unsigned long lastWebSendMs     = 0;
+unsigned long lastWebSyncMs     = 0;
+unsigned long lastValidSpeedMs  = 0;
+unsigned long lastDistCalcMs    = 0;
 bool blinkState = false;
 
 int  wibDay = 1, wibMonth = 1, wibYear = 2026;
@@ -97,7 +98,6 @@ const char* MONTH_NAMES[] = {
 // ============================================================
 void startTimeSync() {
     if (timeSyncStarted) return;
-    // GMT+7 (7 * 3600 detik) untuk WIB
     configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com", "id.pool.ntp.org");
     timeSyncStarted = true;
     Serial.println(F("[TIME] NTP Time Sync Dimulai (GMT+7 WIB)..."));
@@ -113,9 +113,8 @@ int daysInMonth(int month, int year) {
 }
 
 void updateDateTime() {
-    // 1. Prioritas Utama: NTP Internet Clock (Presisi Detik & Pasti Realtime)
     time_t now = time(nullptr);
-    if (now > 1700000000) { // Waktu epoch valid (tahun > 2023)
+    if (now > 1700000000) { // Waktu epoch valid
         struct tm timeinfo;
         localtime_r(&now, &timeinfo);
         wibYear   = timeinfo.tm_year + 1900;
@@ -128,7 +127,6 @@ void updateDateTime() {
         return;
     }
 
-    // 2. Fallback: GPS Atomic Clock (Jika tidak ada koneksi internet)
     if (gps.time.isValid() && gps.date.isValid() && gps.date.year() >= 2024) {
         int hour  = gps.time.hour() + UTC_OFFSET_HOURS;
         int day   = gps.date.day();
@@ -160,7 +158,7 @@ void updateDateTime() {
 }
 
 // ============================================================
-// 7. WIFI STATE MANAGEMENT (SUPER CEPAT & NON-BLOCKING)
+// 7. WIFI STATE MANAGEMENT (NON-BLOCKING)
 // ============================================================
 enum WifiState { WIFI_IDLE, WIFI_CONNECTING, WIFI_CONNECTED };
 WifiState wifiState = WIFI_IDLE;
@@ -174,10 +172,10 @@ void startWifi() {
     delay(40);
 
     WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false);              // Latensi instan
+    WiFi.setSleep(false);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
-    WiFi.setTxPower(WIFI_POWER_11dBm); // Cegah drop tegangan
+    WiFi.setTxPower(WIFI_POWER_11dBm);
 
     WiFi.begin(ssid, password);
     wifiStart = millis();
@@ -197,7 +195,7 @@ void updateWifi() {
                 Serial.print("[WIFI] IP: ");
                 Serial.println(WiFi.localIP());
                 wifiState = WIFI_CONNECTED;
-                startTimeSync(); // Langsung sync jam WIB real-time
+                startTimeSync();
             } else {
                 if (millis() - dotTimer > 500) {
                     Serial.print(".");
@@ -224,7 +222,7 @@ void updateWifi() {
 }
 
 // ============================================================
-// 8. KOMUNIKASI RINGAN KE FIREBASE WEB (REST API - ZERO LAG)
+// 8. KOMUNIKASI RINGAN KE FIREBASE WEB (REUSED TLS - ZERO STALL)
 // ============================================================
 void sendTelemetryToWeb() {
     if (wifiState != WIFI_CONNECTED) return;
@@ -233,15 +231,13 @@ void sendTelemetryToWeb() {
     if (now - lastWebSendMs < WEB_SEND_INTERVAL_MS) return;
     lastWebSendMs = now;
 
-    WiFiClientSecure client;
-    client.setInsecure();
-    
     HTTPClient http;
     String url = String(FIREBASE_HOST) + "/vehicle/current.json";
     
-    http.begin(client, url);
+    http.begin(firebaseClient, url);
+    http.setReuse(true);
     http.addHeader("Content-Type", "application/json");
-    http.setTimeout(1200);
+    http.setTimeout(800);
 
     char timeStr[12], dateStr[16];
     if (dateTimeValid) {
@@ -280,14 +276,12 @@ void syncSpeedLimitFromWeb() {
     if (now - lastWebSyncMs < WEB_SYNC_INTERVAL_MS) return;
     lastWebSyncMs = now;
 
-    WiFiClientSecure client;
-    client.setInsecure();
-
     HTTPClient http;
     String url = String(FIREBASE_HOST) + "/settings/speedLimit.json";
     
-    http.begin(client, url);
-    http.setTimeout(1200);
+    http.begin(firebaseClient, url);
+    http.setReuse(true);
+    http.setTimeout(800);
 
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -302,7 +296,7 @@ void syncSpeedLimitFromWeb() {
 }
 
 // ============================================================
-// 9. GPS & SPEED
+// 9. GPS, KECEPATAN & TRIP/ODO DENGAN FILTER PRESISI TINGGI
 // ============================================================
 void readGPS() {
     while (gpsSerial.available() > 0) {
@@ -311,30 +305,67 @@ void readGPS() {
 }
 
 void updateSpeed() {
-    gpsFix = gps.location.isValid() && gps.speed.isValid();
-    currentSpeed = gpsFix ? gps.speed.kmph() : 0.0;
+    // 1. Validasi kecepatan GPS dari TinyGPS++ dengan toleransi age 2.2 detik
+    if (gps.speed.isValid() && gps.speed.age() < 2200) {
+        double rawKmph = gps.speed.kmph();
+        // Filter noise saat mobil diam / berhenti di lampu merah (< 1.2 km/h)
+        if (rawKmph < 1.2) {
+            currentSpeed = 0.0;
+        } else {
+            currentSpeed = rawKmph;
+        }
+        lastValidSpeedMs = millis();
+        gpsFix = true;
+    } else if (millis() - lastValidSpeedMs < 2000 && currentSpeed > 1.5) {
+        // Grace period 2 detik: jangan langsung 0 jika hanya 1 frame GPS terlambat
+        gpsFix = (gps.satellites.value() >= 3);
+    } else {
+        currentSpeed = 0.0;
+        gpsFix = (gps.satellites.value() >= 3) || (gps.location.isValid() && gps.location.age() < 3500);
+    }
 }
 
 void updateTripAndOdo() {
-    if (!gps.location.isValid() || !gps.location.isUpdated()) return;
-
-    double curLat = gps.location.lat();
-    double curLng = gps.location.lng();
-
-    if (!hasLastPosition) {
-        lastLat = curLat;
-        lastLng = curLng;
-        hasLastPosition = true;
+    unsigned long now = millis();
+    if (lastDistCalcMs == 0) {
+        lastDistCalcMs = now;
         return;
     }
+    double dtSec = (now - lastDistCalcMs) / 1000.0;
+    lastDistCalcMs = now;
 
-    double distanceM = TinyGPSPlus::distanceBetween(lastLat, lastLng, curLat, curLng);
-    if (distanceM >= MIN_MOVE_METERS) {
-        double distanceKm = distanceM / 1000.0;
-        tripKm += distanceKm;
-        odoKm  += distanceKm;
-        lastLat = curLat;
-        lastLng = curLng;
+    // Jika kendaraan tidak bergerak / diam, abaikan untuk cegah phantom distance
+    if (currentSpeed < 1.2 || !gpsFix) return;
+
+    if (gps.location.isValid() && gps.location.isUpdated()) {
+        double curLat = gps.location.lat();
+        double curLng = gps.location.lng();
+
+        if (!hasLastPosition) {
+            lastLat = curLat;
+            lastLng = curLng;
+            hasLastPosition = true;
+            return;
+        }
+
+        double distanceM = TinyGPSPlus::distanceBetween(lastLat, lastLng, curLat, curLng);
+        // Validasi jarak per update antara 0.4 meter dan 120 meter (buang glitch teleport GPS)
+        if (distanceM >= 0.4 && distanceM <= 120.0) {
+            double distanceKm = distanceM / 1000.0;
+            tripKm += distanceKm;
+            odoKm  += distanceKm;
+            lastLat = curLat;
+            lastLng = curLng;
+            maybeSaveOdo();
+            return;
+        }
+    }
+
+    // Dead-reckoning halus saat mobil bergerak tapi frame koordinat belum berubah
+    if (dtSec > 0.05 && dtSec < 1.5 && currentSpeed >= 1.5) {
+        double deltaKm = (currentSpeed / 3600.0) * dtSec;
+        tripKm += deltaKm;
+        odoKm  += deltaKm;
         maybeSaveOdo();
     }
 }
@@ -451,6 +482,8 @@ void setup() {
     digitalWrite(GREEN_LED_PIN, LOW);
     digitalWrite(ORANGE_LED_PIN, LOW);
 
+    // Perbesar buffer UART GPS menjadi 1KB agar tidak ada kalimat NMEA yang drop
+    gpsSerial.setRxBufferSize(1024);
     gpsSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
     Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
@@ -461,6 +494,8 @@ void setup() {
 
     preferences.begin("speedo", false);
     loadOdo();
+
+    firebaseClient.setInsecure();
 
     Serial.println(F("=== SPEEDOMETER & REALTIME NTP CLOCK READY ==="));
 

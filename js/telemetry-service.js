@@ -42,6 +42,41 @@ export function dispatchLocalUpdate(channel, data) {
   }
 }
 
+// In-memory persistent state so partial SSE updates never reset properties to 0
+let currentTelemetryState = {
+  speed: 0,
+  rawSpeed: 0,
+  odo: 0,
+  trip: 0.0,
+  speedLimit: 60,
+  gps: 'Connected',
+  esp32: 'Online',
+  status: 'Normal',
+  date: '--',
+  time: '--',
+  lastUpdate: '--',
+  lat: 0,
+  lng: 0,
+  satellites: 0
+};
+
+function handleSsePayload(payload) {
+  if (!payload) return;
+  const path = payload.path || '/';
+  const data = payload.data;
+  if (data === undefined || data === null) return;
+
+  if (path === '/' && typeof data === 'object') {
+    handleIncomingData(data);
+  } else {
+    // Partial path update e.g. path = "/speed", data = 32
+    const key = path.replace(/^\//, '');
+    if (key) {
+      handleIncomingData({ [key]: data });
+    }
+  }
+}
+
 /**
  * Initialize Realtime Firebase EventSource Stream (Zero-Dependency SSE)
  */
@@ -52,7 +87,7 @@ export function initFirebaseRealtime() {
   fetch(streamUrl)
     .then(res => res.json())
     .then(data => {
-      if (data) {
+      if (data && typeof data === 'object') {
         handleIncomingData(data);
       }
     })
@@ -79,9 +114,7 @@ export function initFirebaseRealtime() {
     eventSource.addEventListener('put', (e) => {
       try {
         const payload = JSON.parse(e.data);
-        if (payload && payload.data) {
-          handleIncomingData(payload.data);
-        }
+        handleSsePayload(payload);
       } catch (err) {
         console.error('[Firebase] SSE parse error:', err);
       }
@@ -90,9 +123,7 @@ export function initFirebaseRealtime() {
     eventSource.addEventListener('patch', (e) => {
       try {
         const payload = JSON.parse(e.data);
-        if (payload && payload.data) {
-          handleIncomingData(payload.data);
-        }
+        handleSsePayload(payload);
       } catch (err) {
         console.error('[Firebase] SSE parse error:', err);
       }
@@ -111,43 +142,51 @@ export function initFirebaseRealtime() {
     console.error('[Firebase] EventSource error:', err);
   }
 
-  // Heartbeat watchdog (fallback poll every 2s in case SSE drops)
+  // Heartbeat watchdog (fallback poll every 3s in case SSE drops)
   setInterval(() => {
     fetch(streamUrl)
       .then(res => res.json())
       .then(data => {
-        if (data) handleIncomingData(data);
+        if (data && typeof data === 'object') handleIncomingData(data);
       })
       .catch(() => {});
-  }, 2000);
+  }, 3000);
 }
 
 function handleIncomingData(data) {
-  if (!data) return;
+  if (!data || typeof data !== 'object') return;
   lastDataTime = Date.now();
-  
-  // Clean & sanitize hardware data
-  const telemetry = {
-    speed: Number(data.speed) || 0,
-    rawSpeed: Number(data.rawSpeed) || Number(data.speed) || 0,
-    odo: Number(data.odo) || 0,
-    trip: Number(data.trip) || 0,
-    speedLimit: Number(data.speedLimit) || 60,
-    gps: data.gps || 'Connected',
-    esp32: data.esp32 || 'Online',
-    status: data.status || 'Normal',
-    date: data.date || '--',
-    time: data.time || '--',
-    lastUpdate: data.lastUpdate || data.time || 'Live',
-    lat: data.lat || 0,
-    lng: data.lng || 0,
-    satellites: data.satellites || 0
-  };
 
-  dispatchLocalUpdate('vehicle', telemetry);
-  if (data.speedLimit) {
-    dispatchLocalUpdate('speedLimit', Number(data.speedLimit));
+  // Merge selectively into persistent telemetry state without resetting untouched properties
+  if (data.speed !== undefined && !isNaN(Number(data.speed))) {
+    currentTelemetryState.speed = Number(data.speed);
   }
+  if (data.rawSpeed !== undefined && !isNaN(Number(data.rawSpeed))) {
+    currentTelemetryState.rawSpeed = Number(data.rawSpeed);
+  } else if (data.speed !== undefined) {
+    currentTelemetryState.rawSpeed = Number(data.speed);
+  }
+  if (data.odo !== undefined && !isNaN(Number(data.odo)) && Number(data.odo) > 0) {
+    currentTelemetryState.odo = Number(data.odo);
+  }
+  if (data.trip !== undefined && !isNaN(Number(data.trip))) {
+    currentTelemetryState.trip = Number(data.trip);
+  }
+  if (data.speedLimit !== undefined && !isNaN(Number(data.speedLimit))) {
+    currentTelemetryState.speedLimit = Number(data.speedLimit);
+    dispatchLocalUpdate('speedLimit', currentTelemetryState.speedLimit);
+  }
+  if (data.gps !== undefined) currentTelemetryState.gps = data.gps;
+  if (data.esp32 !== undefined) currentTelemetryState.esp32 = data.esp32;
+  if (data.status !== undefined) currentTelemetryState.status = data.status;
+  if (data.date !== undefined && data.date !== '--') currentTelemetryState.date = data.date;
+  if (data.time !== undefined && data.time !== '--:--:--') currentTelemetryState.time = data.time;
+  if (data.lastUpdate !== undefined) currentTelemetryState.lastUpdate = data.lastUpdate;
+  if (data.lat !== undefined && !isNaN(Number(data.lat)) && Number(data.lat) !== 0) currentTelemetryState.lat = Number(data.lat);
+  if (data.lng !== undefined && !isNaN(Number(data.lng)) && Number(data.lng) !== 0) currentTelemetryState.lng = Number(data.lng);
+  if (data.satellites !== undefined) currentTelemetryState.satellites = Number(data.satellites) || 0;
+
+  dispatchLocalUpdate('vehicle', { ...currentTelemetryState });
 }
 
 /**
