@@ -1,17 +1,17 @@
 /**
- * FIREBASE CONFIGURATION
+ * FIREBASE CONFIGURATION - VEHICLE MONITOR SCADA
  * 
- * Auto-configured from Firebase Project: greenhouse-firebase-56abd
+ * Auto-configured from New Dedicated Firebase Project: vehicle-monitor-esp32
  */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAxPO-OEL2cnlQstspnjkyIq-3VOzYK8KM",
-  authDomain: "greenhouse-firebase-56abd.firebaseapp.com",
-  databaseURL: "https://greenhouse-firebase-56abd-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "greenhouse-firebase-56abd",
-  storageBucket: "greenhouse-firebase-56abd.firebasestorage.app",
-  messagingSenderId: "347929965464",
-  appId: "1:347929965464:web:36e778ff71f8a370b431ed"
+  apiKey: "AIzaSyCQ-QHh2d5FnRcJiHyxrjd4vwYgVOFuiKY",
+  authDomain: "vehicle-monitor-esp32.firebaseapp.com",
+  databaseURL: "https://vehicle-monitor-esp32-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "vehicle-monitor-esp32",
+  storageBucket: "vehicle-monitor-esp32.firebasestorage.app",
+  messagingSenderId: "879479057002",
+  appId: "1:879479057002:web:b29654b3d331025224b813"
 };
 
 /**

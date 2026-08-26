@@ -12,13 +12,13 @@
 #include <addons/RTDBHelper.h>
 
 // ============================================================
-// KONFIGURASI WIFI & FIREBASE REALTIME DATABASE (AUTO CONFIGURED)
+// KONFIGURASI WIFI & FIREBASE REALTIME DATABASE (DEDICATED PROJECT)
 // ============================================================
 #define WIFI_SSID       "GALAXY A33 5G"
 #define WIFI_PASSWORD   "cicing77"
 
-#define API_KEY         "AIzaSyAxPO-OEL2cnlQstspnjkyIq-3VOzYK8KM"
-#define DATABASE_URL    "https://greenhouse-firebase-56abd-default-rtdb.asia-southeast1.firebasedatabase.app/"
+#define API_KEY         "AIzaSyCQ-QHh2d5FnRcJiHyxrjd4vwYgVOFuiKY"
+#define DATABASE_URL    "https://vehicle-monitor-esp32-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 // ============================================================
 // PIN CONFIGURATION (ESP32-C3)
@@ -39,10 +39,10 @@
 // ============================================================
 // KONFIGURASI UTAMA & DEFAULT
 // ============================================================
-#define DEFAULT_SPEED_LIMIT 60.0    // Nilai default awal jika belum diset dari web
-#define INITIAL_ODO_KM      97000.0 // Odometer awal
-#define MIN_MOVE_METERS     2.0     // Filter jitter GPS saat diam
-#define UTC_OFFSET_HOURS    7       // WIB = UTC+7
+#define DEFAULT_SPEED_LIMIT 60.0
+#define INITIAL_ODO_KM      97000.0
+#define MIN_MOVE_METERS     2.0
+#define UTC_OFFSET_HOURS    7
 
 // ============================================================
 // KONFIGURASI TIMING (Semua Non-Blocking millis())
@@ -50,7 +50,7 @@
 #define OLED_UPDATE_INTERVAL_MS      150
 #define LED_BLINK_INTERVAL_MS        300
 #define DEBUG_PRINT_INTERVAL_MS      1000
-#define FIREBASE_SEND_INTERVAL_MS    1000   // Kirim telemetri ke web tiap 1 detik
+#define FIREBASE_SEND_INTERVAL_MS    1000   // Kirim telemetri ke cloud tiap 1 detik
 #define FIREBASE_SYNC_LIMIT_MS       2000   // Cek update speed limit dari web tiap 2 detik
 
 #define ODO_SAVE_DISTANCE_KM         0.5
@@ -66,7 +66,6 @@ HardwareSerial gpsSerial(1);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Preferences preferences;
 
-// Objek Firebase
 FirebaseData fbdoData;
 FirebaseAuth auth;
 FirebaseConfig config;
@@ -171,7 +170,6 @@ void setup() {
   preferences.begin("speedo", false);
   loadOdo();
 
-  // Inisialisasi Koneksi WiFi & Firebase
   initWiFi();
   initFirebase();
 
@@ -193,7 +191,6 @@ void loop() {
   updateLED();
   updateOLED();
 
-  // Sinkronisasi Data Firebase Cloud
   if (Firebase.ready() && isFirebaseReady) {
     syncSpeedLimitFromFirebase();
     sendTelemetryToFirebase();
@@ -237,7 +234,6 @@ void initFirebase() {
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
 
-  // Anonymous Sign In
   if (Firebase.signUp(&config, &auth, "", "")) {
     Serial.println(F("[Firebase] SignUp Anonymous Berhasil!"));
     isFirebaseReady = true;
@@ -266,7 +262,6 @@ void syncSpeedLimitFromFirebase() {
   if (now - lastLimitSyncMs < FIREBASE_SYNC_LIMIT_MS) return;
   lastLimitSyncMs = now;
 
-  // Baca Speed Limit yang diubah user dari Web Dashboard
   if (Firebase.RTDB.getInt(&fbdoData, "/settings/speedLimit")) {
     if (fbdoData.dataType() == "int" || fbdoData.dataType() == "float") {
       int newLimit = fbdoData.intData();
