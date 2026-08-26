@@ -7,7 +7,9 @@ const STATIC_ASSETS = [
   './js/maintenance-engine.js',
   './js/telemetry-service.js',
   './manifest.json',
-  './assets/icons/icon.svg'
+  './assets/icons/icon.svg',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png'
 ];
 
 // Install: Pre-cache static shell
