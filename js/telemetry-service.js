@@ -47,7 +47,7 @@ export function dispatchLocalUpdate(channel, data) {
 let currentTelemetryState = {
   speed: 0,
   rawSpeed: 0,
-  odo: 0,
+  odo: 97248,
   trip: 0.0,
   speedLimit: 60,
   gps: 'Connected',

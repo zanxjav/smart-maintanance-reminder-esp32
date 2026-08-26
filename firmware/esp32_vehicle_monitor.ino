@@ -76,6 +76,9 @@ double lastLat = 0.0;
 double lastLng = 0.0;
 bool   hasLastPosition = false;
 
+// Filter anti-jitter kecepatan saat diam
+int    consecutiveSpeedHits = 0;
+
 double odoAtLastSave = INITIAL_ODO_KM;
 unsigned long lastOdoSaveMs = 0;
 
@@ -252,10 +255,17 @@ void sendTelemetryToWeb() {
         snprintf(timeStr, sizeof(timeStr), "--:--:--");
     }
 
+    int sendSpeed = 0;
+    double sendRawSpeed = 0.0;
+    if (currentSpeed >= 2.8) {
+        sendSpeed = (int)(currentSpeed + 0.5);
+        sendRawSpeed = currentSpeed;
+    }
+
     String json = "{";
-    json += "\"speed\":" + String((int)(currentSpeed + 0.5)) + ",";
-    json += "\"rawSpeed\":" + String(currentSpeed, 1) + ",";
-    json += "\"odo\":" + String((long)odoKm) + ",";
+    json += "\"speed\":" + String(sendSpeed) + ",";
+    json += "\"rawSpeed\":" + String(sendRawSpeed, 1) + ",";
+    json += "\"odo\":" + String((long)(odoKm + 0.5)) + ",";
     json += "\"trip\":" + String(tripKm, 2) + ",";
     json += "\"speedLimit\":" + String((int)speedLimit) + ",";
     json += "\"gps\":\"" + String(gpsFix ? "Connected" : "No Signal") + "\",";
@@ -340,23 +350,37 @@ void readGPS() {
 }
 
 void updateSpeed() {
-    // 1. Validasi kecepatan GPS dari TinyGPS++ dengan toleransi age 2.2 detik
-    if (gps.speed.isValid() && gps.speed.age() < 2200) {
+    // 1. Validasi kecepatan GPS dari TinyGPS++ dengan syarat satelit memadai (>= 4)
+    if (gps.speed.isValid() && gps.speed.age() < 2000 && gps.satellites.value() >= 4) {
         double rawKmph = gps.speed.kmph();
-        // Filter noise saat mobil diam / berhenti di lampu merah (< 1.2 km/h)
-        if (rawKmph < 1.2) {
+
+        // Filter noise saat mobil diam / berhenti di lampu merah (< 2.8 km/h dipaksa murni 0.0)
+        if (rawKmph < 2.8) {
+            consecutiveSpeedHits = 0;
             currentSpeed = 0.0;
         } else {
-            currentSpeed = rawKmph;
+            consecutiveSpeedHits++;
+            // Memerlukan minimal 2 frame valid berturut-turut untuk berpindah dari diam ke bergerak
+            // Ini mencegah glitch 1-frame GPS saat mobil sedang berhenti
+            if (consecutiveSpeedHits >= 2 || currentSpeed > 0.0) {
+                // Hysteresis: jika sudah melaju, toleransi hingga < 2.0 km/h sebelum kembali ke 0
+                if (rawKmph >= 2.0) {
+                    currentSpeed = rawKmph;
+                } else {
+                    currentSpeed = 0.0;
+                    consecutiveSpeedHits = 0;
+                }
+            }
         }
         lastValidSpeedMs = millis();
         gpsFix = true;
-    } else if (millis() - lastValidSpeedMs < 2000 && currentSpeed > 1.5) {
-        // Grace period 2 detik: jangan langsung 0 jika hanya 1 frame GPS terlambat
-        gpsFix = (gps.satellites.value() >= 3);
+    } else if (millis() - lastValidSpeedMs < 1500 && currentSpeed >= 3.5) {
+        // Grace period singkat hanya jika kendaraan memang sedang melaju
+        gpsFix = (gps.satellites.value() >= 4);
     } else {
         currentSpeed = 0.0;
-        gpsFix = (gps.satellites.value() >= 3) || (gps.location.isValid() && gps.location.age() < 3500);
+        consecutiveSpeedHits = 0;
+        gpsFix = (gps.satellites.value() >= 4) || (gps.location.isValid() && gps.location.age() < 3000);
     }
 }
 
@@ -369,8 +393,15 @@ void updateTripAndOdo() {
     double dtSec = (now - lastDistCalcMs) / 1000.0;
     lastDistCalcMs = now;
 
-    // Jika kendaraan tidak bergerak / diam, abaikan untuk cegah phantom distance
-    if (currentSpeed < 1.2 || !gpsFix) return;
+    // Jika kendaraan diam (kecepatan 0 atau di bawah deadband), jangan hitung jarak sama sekali
+    if (currentSpeed < 2.8 || !gpsFix) {
+        if (gps.location.isValid()) {
+            lastLat = gps.location.lat();
+            lastLng = gps.location.lng();
+            hasLastPosition = true;
+        }
+        return;
+    }
 
     if (gps.location.isValid() && gps.location.isUpdated()) {
         double curLat = gps.location.lat();
@@ -384,8 +415,8 @@ void updateTripAndOdo() {
         }
 
         double distanceM = TinyGPSPlus::distanceBetween(lastLat, lastLng, curLat, curLng);
-        // Validasi jarak per update antara 0.4 meter dan 120 meter (buang glitch teleport GPS)
-        if (distanceM >= 0.4 && distanceM <= 120.0) {
+        // Validasi jarak per update antara 0.8 meter dan 120 meter (buang glitch teleport GPS)
+        if (distanceM >= 0.8 && distanceM <= 120.0) {
             double distanceKm = distanceM / 1000.0;
             tripKm += distanceKm;
             odoKm  += distanceKm;
@@ -397,7 +428,7 @@ void updateTripAndOdo() {
     }
 
     // Dead-reckoning halus saat mobil bergerak tapi frame koordinat belum berubah
-    if (dtSec > 0.05 && dtSec < 1.5 && currentSpeed >= 1.5) {
+    if (dtSec > 0.05 && dtSec < 1.5 && currentSpeed >= 3.0) {
         double deltaKm = (currentSpeed / 3600.0) * dtSec;
         tripKm += deltaKm;
         odoKm  += deltaKm;
@@ -407,6 +438,10 @@ void updateTripAndOdo() {
 
 void loadOdo() {
     odoKm = preferences.getDouble("odoKm", INITIAL_ODO_KM);
+    if (odoKm < 50000.0) {
+        odoKm = INITIAL_ODO_KM;
+        preferences.putDouble("odoKm", odoKm);
+    }
     odoAtLastSave = odoKm;
 }
 
@@ -501,8 +536,12 @@ void updateOLED() {
     // Kecepatan
     if (!(overSpeedActive && !blinkState)) {
         char speedStr[6];
-        if (gpsFix) snprintf(speedStr, sizeof(speedStr), "%d", (int)(currentSpeed + 0.5));
-        else snprintf(speedStr, sizeof(speedStr), "--");
+        if (gpsFix) {
+            int displaySpeed = (currentSpeed >= 2.8) ? (int)(currentSpeed + 0.5) : 0;
+            snprintf(speedStr, sizeof(speedStr), "%d", displaySpeed);
+        } else {
+            snprintf(speedStr, sizeof(speedStr), "--");
+        }
         printCentered(speedStr, 16, 4);
     }
 

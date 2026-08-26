@@ -12,7 +12,7 @@ class DemoSimulator {
   constructor() {
     this.speed = 42;
     this.targetSpeed = 42;
-    this.odo = 97128.0;
+    this.odo = 97248.0;
     this.trip = 128.6;
     this.speedLimit = 60;
     this.gpsStatus = "Connected";

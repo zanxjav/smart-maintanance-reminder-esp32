@@ -20,7 +20,7 @@ import { maintenanceEngine } from './maintenance-engine.js';
 
 let currentSpeed = 0;
 let currentSpeedLimit = 60;
-let currentOdo = 0;
+let currentOdo = 97248;
 let currentTrip = 0;
 let currentStatus = "Normal";
 
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEditIntervalModal();
   setupConnectionModal();
   populateServiceModalDropdown();
+  maintenanceEngine.setCurrentOdo(currentOdo);
   renderMaintenanceReminders();
 
   // 2. Start Realtime Hardware Telemetry (No Dummy Data)
@@ -96,8 +97,10 @@ let lastDisplayedTrip = -1;
 function handleVehicleDataUpdate(data) {
   if (!data) return;
 
-  currentSpeed = Number(data.speed) || 0;
-  currentOdo = Number(data.odo) || currentOdo;
+  const rawSpd = Number(data.rawSpeed !== undefined ? data.rawSpeed : data.speed) || 0;
+  // Clean stationary deadband filter (anything under 2.5 km/h is treated strictly as 0)
+  currentSpeed = rawSpd < 2.5 ? 0 : rawSpd;
+  currentOdo = (Number(data.odo) > 0) ? Number(data.odo) : currentOdo;
   currentTrip = Number(data.trip) || currentTrip;
   currentStatus = data.status || currentStatus;
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vehicle-monitor-v3';
+const CACHE_NAME = 'vehicle-monitor-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',
