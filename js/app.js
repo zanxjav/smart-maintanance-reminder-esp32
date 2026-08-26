@@ -184,7 +184,7 @@ function renderMaintenanceReminders() {
     }
   }
 
-  // 2. Dynamic Update of Dashboard Main Cards (Oli Mesin, Transmisi, Coolant)
+  // 2. Dynamic Update of Dashboard Main Cards (Engine Oil, Transmission, Coolant)
   const previewKeys = ['oil_engine', 'transmission_oil', 'coolant'];
   previewKeys.forEach(key => {
     const item = allCards.find(c => c.key === key);
@@ -195,15 +195,22 @@ function renderMaintenanceReminders() {
     const remEl = document.getElementById(`rem-${key}`);
     const barEl = document.getElementById(`bar-${key}`);
     const pctEl = document.getElementById(`pct-${key}`);
+    const tagEl = document.getElementById(`tag-${key}`);
+
+    const pct = Math.max(0, Math.min(100, Math.round(Number(item.percentUsed !== undefined ? item.percentUsed : item.progressPercent) || 0)));
 
     if (nameEl) nameEl.textContent = item.name;
     if (intEl) intEl.textContent = `Setiap ${maintenanceEngine.formatNumber(item.intervalKm)} km`;
     if (remEl) {
       remEl.textContent = item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} km lagi` : 'Jatuh tempo';
     }
-    if (pctEl) pctEl.textContent = `${item.percentUsed}%`;
+    if (pctEl) pctEl.textContent = `${pct}%`;
+    if (tagEl) {
+      tagEl.textContent = item.status === 'DUE' ? 'Due Service' : (item.status === 'WARNING' ? 'Warning' : 'Normal');
+      tagEl.className = `m-status-tag ${item.status.toLowerCase()}`;
+    }
     if (barEl) {
-      barEl.style.width = `${item.percentUsed}%`;
+      barEl.style.width = `${pct}%`;
       if (item.status === 'DUE') {
         barEl.style.background = '#ef4444';
       } else if (item.status === 'WARNING') {
@@ -449,5 +456,55 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 250);
   }, 2800);
 }
+
+/* ==========================================================================
+   PWA INSTALL & SERVICE WORKER REGISTRATION
+   ========================================================================== */
+let deferredPwaPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  const btn = document.getElementById('btnInstallPWA');
+  if (btn) {
+    btn.classList.add('visible');
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPwaPrompt = null;
+  const btn = document.getElementById('btnInstallPWA');
+  if (btn) btn.style.display = 'none';
+  showToast('Aplikasi Vehicle Monitor berhasil terpasang di HP/Laptop Anda!', 'success');
+});
+
+document.getElementById('btnInstallPWA')?.addEventListener('click', async () => {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    const { outcome } = await deferredPwaPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('Memasang aplikasi...', 'success');
+    }
+    deferredPwaPrompt = null;
+  } else {
+    // Guide for Android / iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      showToast('Di Safari iPhone: Ketuk tombol Share (ikon kotak panah ke atas) lalu pilih "Add to Home Screen".', 'info');
+    } else {
+      showToast('Di Chrome/Browser: Ketuk menu titik tiga (⋮) di kanan atas lalu pilih "Install App" / "Tambahkan ke Layar Utama".', 'info');
+    }
+  }
+});
+
+// Register SW
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[PWA] Service Worker Registered'))
+      .catch(err => console.warn('[PWA] Service Worker failed:', err));
+  });
+}
+
 
 

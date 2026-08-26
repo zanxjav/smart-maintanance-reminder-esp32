@@ -6,10 +6,20 @@
   <title>Vehicle Monitor - Dashboard</title>
   <meta name="description" content="Vehicle Monitor dashboard with real-time overview, trip meter, speed limiter, and maintenance reminders.">
 
+  <!-- PWA & Mobile Capabilities -->
+  <meta name="theme-color" content="#0b0f19">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VehicleMonitor">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg">
+  <link rel="apple-touch-icon" href="./assets/icons/icon.svg">
+
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="./css/style.css">
 </head>
@@ -34,6 +44,16 @@
       </div>
 
       <div class="nav-right">
+        <!-- PWA Download / Install Button -->
+        <button class="install-pwa-btn" id="btnInstallPWA" aria-label="Download Aplikasi" title="Download & Pasang Aplikasi">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Install App</span>
+        </button>
+
         <button class="connection-status-btn" id="btnEsp32Status" aria-label="Status Sistem" title="Status Telemetri">
           <span class="status-indicator-dot online" id="esp32Dot"></span>
           <span class="status-indicator-label" id="esp32StatusLabel">Live Telemetry</span>
@@ -232,84 +252,96 @@
 
         <div class="maintenance-items-list" id="maintenanceListContainer">
           
-          <!-- Item 1: Ganti Oli Mesin -->
+          <!-- Item 1: Engine Oil -->
           <div class="m-row-item" data-key="oil_engine">
-            <div class="m-left-group">
-              <div class="m-icon-box green">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                </svg>
+            <div class="m-card-top">
+              <div class="m-left-group">
+                <div class="m-icon-box green">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                  </svg>
+                </div>
+                <div class="m-text-info">
+                  <span class="m-name" id="name-oil_engine">Engine Oil</span>
+                  <span class="m-sub" id="interval-oil_engine">Setiap 20,000 km</span>
+                </div>
               </div>
-              <div class="m-text-info">
-                <span class="m-name" id="name-oil_engine">Ganti Oli Mesin</span>
-                <span class="m-sub" id="interval-oil_engine">Setiap 7,000 km</span>
+              <div class="m-right-group">
+                <span class="m-pct-pill" id="pct-oil_engine">0%</span>
+                <span class="m-arrow">›</span>
               </div>
             </div>
 
-            <div class="m-mid-progress">
-              <span class="m-remaining-text" id="rem-oil_engine">2,340 km lagi</span>
+            <div class="m-card-bottom">
+              <div class="m-progress-labels">
+                <span class="m-remaining-text" id="rem-oil_engine">20,000 km lagi</span>
+                <span class="m-status-tag normal" id="tag-oil_engine">Normal</span>
+              </div>
               <div class="m-bar-track">
-                <div class="m-bar-fill green" id="bar-oil_engine" style="width: 66%;"></div>
+                <div class="m-bar-fill green" id="bar-oil_engine" style="width: 0%;"></div>
               </div>
-            </div>
-
-            <div class="m-right-group">
-              <span id="pct-oil_engine">66%</span>
-              <span class="m-arrow">›</span>
             </div>
           </div>
 
-          <!-- Item 2: Oli Transmisi -->
+          <!-- Item 2: Transmission Fluid -->
           <div class="m-row-item" data-key="transmission_oil">
-            <div class="m-left-group">
-              <div class="m-icon-box orange">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-                </svg>
+            <div class="m-card-top">
+              <div class="m-left-group">
+                <div class="m-icon-box orange">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                  </svg>
+                </div>
+                <div class="m-text-info">
+                  <span class="m-name" id="name-transmission_oil">Transmission Fluid</span>
+                  <span class="m-sub" id="interval-transmission_oil">Setiap 40,000 km</span>
+                </div>
               </div>
-              <div class="m-text-info">
-                <span class="m-name" id="name-transmission_oil">Oli Transmisi</span>
-                <span class="m-sub" id="interval-transmission_oil">Setiap 20,000 km</span>
+              <div class="m-right-group">
+                <span class="m-pct-pill" id="pct-transmission_oil">0%</span>
+                <span class="m-arrow">›</span>
               </div>
             </div>
 
-            <div class="m-mid-progress">
-              <span class="m-remaining-text" id="rem-transmission_oil">12,340 km lagi</span>
+            <div class="m-card-bottom">
+              <div class="m-progress-labels">
+                <span class="m-remaining-text" id="rem-transmission_oil">40,000 km lagi</span>
+                <span class="m-status-tag normal" id="tag-transmission_oil">Normal</span>
+              </div>
               <div class="m-bar-track">
-                <div class="m-bar-fill orange" id="bar-transmission_oil" style="width: 38%;"></div>
+                <div class="m-bar-fill orange" id="bar-transmission_oil" style="width: 0%;"></div>
               </div>
-            </div>
-
-            <div class="m-right-group">
-              <span id="pct-transmission_oil">38%</span>
-              <span class="m-arrow">›</span>
             </div>
           </div>
 
-          <!-- Item 3: Cairan Coolant -->
+          <!-- Item 3: Radiator Coolant -->
           <div class="m-row-item" data-key="coolant">
-            <div class="m-left-group">
-              <div class="m-icon-box purple">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
-                </svg>
+            <div class="m-card-top">
+              <div class="m-left-group">
+                <div class="m-icon-box purple">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+                  </svg>
+                </div>
+                <div class="m-text-info">
+                  <span class="m-name" id="name-coolant">Radiator Coolant</span>
+                  <span class="m-sub" id="interval-coolant">Setiap 40,000 km</span>
+                </div>
               </div>
-              <div class="m-text-info">
-                <span class="m-name" id="name-coolant">Cairan Coolant</span>
-                <span class="m-sub" id="interval-coolant">Setiap 2 tahun</span>
+              <div class="m-right-group">
+                <span class="m-pct-pill" id="pct-coolant">0%</span>
+                <span class="m-arrow">›</span>
               </div>
             </div>
 
-            <div class="m-mid-progress">
-              <span class="m-remaining-text" id="rem-coolant">8 bulan lagi</span>
+            <div class="m-card-bottom">
+              <div class="m-progress-labels">
+                <span class="m-remaining-text" id="rem-coolant">40,000 km lagi</span>
+                <span class="m-status-tag normal" id="tag-coolant">Normal</span>
+              </div>
               <div class="m-bar-track">
-                <div class="m-bar-fill purple" id="bar-coolant" style="width: 67%;"></div>
+                <div class="m-bar-fill purple" id="bar-coolant" style="width: 0%;"></div>
               </div>
-            </div>
-
-            <div class="m-right-group">
-              <span id="pct-coolant">67%</span>
-              <span class="m-arrow">›</span>
             </div>
           </div>
 

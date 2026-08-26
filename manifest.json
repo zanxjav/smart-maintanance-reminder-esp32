@@ -1,0 +1,26 @@
+{
+  "name": "Vehicle Monitor SCADA",
+  "short_name": "VehicleMonitor",
+  "description": "Real-time Automotive Telemetry, GPS Speedometer, and Predictive Maintenance",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
+  "categories": ["utilities", "auto"],
+  "icons": [
+    {
+      "src": "./assets/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

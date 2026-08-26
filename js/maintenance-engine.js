@@ -204,33 +204,44 @@ class MaintenanceEngine {
   /**
    * Evaluate Status (NORMAL, WARNING, DUE) and progress % for an item
    */
-  evaluateItemHealth(typeKey) {
-    const itemSetting = this.settings[typeKey];
-    const itemState = this.state[typeKey];
-
-    if (!itemSetting || !itemState) {
-      return { status: "NORMAL", progressPercent: 0, daysLeft: 0, kmLeft: 0 };
+  evaluateItemHealth(key) {
+    const itemSetting = this.settings[key];
+    if (!itemSetting) {
+      return { status: "NORMAL", progressPercent: 0, percentUsed: 0, kmLeft: 0, daysLeft: 30, nextOdo: 0, nextDate: "" };
     }
 
-    const currentOdo = this.currentOdo;
-    const lastOdo = Number(itemState.lastServiceOdo) || 0;
-    const nextOdo = Number(itemState.nextServiceOdo) || (lastOdo + itemSetting.intervalKm);
+    const itemState = this.state[key] || {};
+    const currentOdo = Number(this.currentOdo) || 0;
+    const intervalKm = Number(itemSetting.intervalKm) || 20000;
+    const intervalMonths = Number(itemSetting.intervalMonths) || 6;
     const reminderKm = Number(itemSetting.reminderKm) || 500;
     const reminderDays = Number(itemSetting.reminderDays) || 7;
+
+    const lastOdo = Number(itemState.lastServiceOdo) || 0;
+    let nextOdo = Number(itemState.nextServiceOdo) || (lastOdo + intervalKm);
+
+    if (nextOdo <= lastOdo) {
+      nextOdo = lastOdo + intervalKm;
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const nextDate = new Date(itemState.nextServiceDate);
-    nextDate.setHours(0, 0, 0, 0);
+    let lastDate = new Date(itemState.lastServiceDate);
+    if (isNaN(lastDate.getTime())) {
+      lastDate = new Date(today);
+    }
 
-    const lastDate = new Date(itemState.lastServiceDate || today);
-    lastDate.setHours(0, 0, 0, 0);
+    let nextDate = new Date(itemState.nextServiceDate);
+    if (isNaN(nextDate.getTime())) {
+      nextDate = new Date(today);
+      nextDate.setMonth(nextDate.getMonth() + intervalMonths);
+    }
 
     // 1. Distance calculations
-    const kmLeft = nextOdo - currentOdo;
-    const kmCovered = currentOdo - lastOdo;
-    const totalKmInterval = nextOdo - lastOdo || itemSetting.intervalKm || 1;
+    const kmLeft = Math.max(0, nextOdo - currentOdo);
+    const kmCovered = Math.max(0, currentOdo - lastOdo);
+    const totalKmInterval = Math.max(1, nextOdo - lastOdo);
     const odoProgress = Math.max(0, Math.min(100, Math.round((kmCovered / totalKmInterval) * 100)));
 
     // 2. Time calculations
@@ -238,20 +249,20 @@ class MaintenanceEngine {
     const daysLeft = Math.ceil(diffTimeMs / (1000 * 60 * 60 * 24));
     
     const totalDaysInterval = Math.max(1, Math.ceil((nextDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const daysPassed = Math.ceil((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysPassed = Math.max(0, Math.ceil((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
     const timeProgress = Math.max(0, Math.min(100, Math.round((daysPassed / totalDaysInterval) * 100)));
 
     // Max progress drives the visual indicator
-    const progressPercent = Math.max(odoProgress, timeProgress);
+    const progressPercent = Math.max(0, Math.min(100, Math.max(odoProgress, timeProgress) || 0));
 
-    // 3. Status Evaluation Logic (Requirement 16)
+    // 3. Status Evaluation Logic
     let status = "NORMAL";
     
-    const isDueByKm = currentOdo >= nextOdo;
-    const isDueByDate = today.getTime() >= nextDate.getTime();
+    const isDueByKm = currentOdo > 0 && currentOdo >= nextOdo;
+    const isDueByDate = today.getTime() >= nextDate.getTime() && daysPassed >= totalDaysInterval;
     
-    const isWarningByKm = currentOdo >= (nextOdo - reminderKm);
-    const isWarningByDate = daysLeft <= reminderDays;
+    const isWarningByKm = currentOdo > 0 && currentOdo >= (nextOdo - reminderKm);
+    const isWarningByDate = daysLeft <= reminderDays && daysLeft > 0;
 
     if (isDueByKm || isDueByDate) {
       status = "DUE";
@@ -263,11 +274,12 @@ class MaintenanceEngine {
 
     return {
       status,
-      progressPercent: Math.min(100, progressPercent),
+      progressPercent,
+      percentUsed: progressPercent,
       kmLeft,
       daysLeft,
       nextOdo,
-      nextDate: itemState.nextServiceDate
+      nextDate: nextDate.toISOString().split('T')[0]
     };
   }
 
