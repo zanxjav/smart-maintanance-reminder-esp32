@@ -66,7 +66,7 @@
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          <span id="liveClockText">24 May 2025, 14:35</span>
+          <span id="liveClockText">Live Clock</span>
         </div>
       </div>
 
@@ -86,7 +86,7 @@
           </div>
           
           <div class="box-middle">
-            <span class="box-val" id="valSpeed">42</span>
+            <span class="box-val" id="valSpeed">0</span>
             <span class="box-unit">km/h</span>
           </div>
 
@@ -113,7 +113,7 @@
           </div>
           
           <div class="box-middle">
-            <span class="box-val" id="valTrip">128.6</span>
+            <span class="box-val" id="valTrip">0.0</span>
             <span class="box-unit">km</span>
           </div>
 
@@ -141,7 +141,7 @@
           </div>
           
           <div class="box-middle">
-            <span class="box-val" id="valOdo">97,128</span>
+            <span class="box-val" id="valOdo">--</span>
             <span class="box-unit">km</span>
           </div>
 
@@ -158,15 +158,17 @@
           <div class="box-top">
             <span class="box-title">Status</span>
             <div class="box-icon-circle status-ok">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
           </div>
           
-          <div>
-            <div class="status-pill-badge" id="valVehicleStatus">Normal</div>
+          <div class="box-middle">
+            <span class="box-val status-val" id="valVehicleStatus">Normal</span>
+          </div>
+
+          <div class="box-bottom-status">
             <div class="status-sub-text">All systems operational</div>
           </div>
         </div>
@@ -196,7 +198,7 @@
             </svg>
 
             <div class="gauge-center-text">
-              <span class="gauge-speed-num" id="valSpeedLarge">42</span>
+              <span class="gauge-speed-num" id="valSpeedLarge">0</span>
               <span class="gauge-speed-unit">km/h</span>
             </div>
           </div>
@@ -327,11 +329,11 @@
           <div class="activity-left">
             <span class="activity-dot" id="recentActivityDot"></span>
             <div class="activity-text">
-              <span class="act-title" id="recentActivityTitle">Speed Alert</span>
-              <span class="act-sub" id="recentActivitySub">Overspeed: 72 km/h</span>
+              <span class="act-title" id="recentActivityTitle">Sistem Aktif</span>
+              <span class="act-sub" id="recentActivitySub">Menunggu pergerakan kendaraan...</span>
             </div>
           </div>
-          <span class="act-time" id="recentActivityTime">24 May 2025, 14:30:15</span>
+          <span class="act-time" id="recentActivityTime">Real-time</span>
         </div>
       </section>
 
@@ -468,7 +470,7 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
             <div class="form-group">
               <label class="form-label" for="serviceOdoInput">Odometer Saat Servis</label>
-              <input type="number" id="serviceOdoInput" class="form-input" required value="97128">
+              <input type="number" id="serviceOdoInput" class="form-input" required placeholder="Contoh: 10000">
             </div>
 
             <div class="form-group">

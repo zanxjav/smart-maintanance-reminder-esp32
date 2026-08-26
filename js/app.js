@@ -5,6 +5,7 @@
  */
 
 import { 
+  initFirebaseRealtime,
   subscribeVehicleData, 
   subscribeSpeedLimit, 
   subscribeMaintenanceStatus, 
@@ -14,12 +15,11 @@ import {
   writeResetTrip 
 } from './telemetry-service.js';
 import { maintenanceEngine } from './maintenance-engine.js';
-import { demoSimulator } from './demo-simulator.js';
 
-let currentSpeed = 42;
+let currentSpeed = 0;
 let currentSpeedLimit = 60;
-let currentOdo = 97128;
-let currentTrip = 128.6;
+let currentOdo = 0;
+let currentTrip = 0;
 let currentStatus = "Normal";
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
   populateServiceModalDropdown();
   renderMaintenanceReminders();
 
-  // 2. Start Realtime Telemetry Simulation Engine
-  demoSimulator.start();
+  // 2. Start Realtime Hardware Telemetry (No Dummy Data)
+  initFirebaseRealtime();
 
   // 3. Telemetry Subscriptions
   subscribeVehicleData((data) => {
@@ -288,7 +288,6 @@ function setupSpeedLimiterModal() {
       e.preventDefault();
       const newLimit = Number(slider.value);
       currentSpeedLimit = newLimit;
-      demoSimulator.setSpeedLimit(newLimit);
       writeSpeedLimit(newLimit);
       updateSpeedLimitDisplay(newLimit);
       closeAllModals();
@@ -305,13 +304,13 @@ function setupUIEvents() {
   // Bottom Tab Navigation
   const tabs = document.querySelectorAll('.nav-tab-item');
   tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', async () => {
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
 
       const tabName = tab.dataset.tab;
       if (tabName === 'trip') {
-        demoSimulator.resetTrip();
+        await writeResetTrip();
         showToast('Trip meter berhasil direset ke 0.0 km', 'success');
         setTimeout(() => {
           document.getElementById('tabNavDashboard')?.classList.add('active');

@@ -102,126 +102,44 @@ export const DEFAULT_MAINTENANCE_SETTINGS = {
   }
 };
 
-// Seeded realistic maintenance state for demo (current ODO: 97,245 KM)
+// Initial clean maintenance state
 export const DEFAULT_MAINTENANCE_STATE = {
-  oil_engine: {
-    lastServiceOdo: 80000,
-    lastServiceDate: "2026-06-25",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2026-08-25",
-    status: "NORMAL"
-  },
-  oil_filter: {
-    lastServiceOdo: 80000,
-    lastServiceDate: "2026-06-25",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2026-08-25",
-    status: "NORMAL"
-  },
-  air_filter: {
-    lastServiceOdo: 60000,
-    lastServiceDate: "2026-04-10",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2026-08-10",
-    status: "WARNING"
-  },
-  coolant: {
-    lastServiceOdo: 60000,
-    lastServiceDate: "2025-08-20",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2026-08-20",
-    status: "DUE"
-  },
-  spark_plug: {
-    lastServiceOdo: 70000,
-    lastServiceDate: "2026-01-15",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2027-01-15",
-    status: "NORMAL"
-  },
-  transmission_oil: {
-    lastServiceOdo: 60000,
-    lastServiceDate: "2025-05-12",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2027-05-12",
-    status: "NORMAL"
-  },
-  brake_fluid: {
-    lastServiceOdo: 80000,
-    lastServiceDate: "2026-02-14",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2027-02-14",
-    status: "NORMAL"
-  },
-  brake_pad: {
-    lastServiceOdo: 70000,
-    lastServiceDate: "2025-09-01",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2027-03-01",
-    status: "NORMAL"
-  },
-  battery: {
-    lastServiceOdo: 50000,
-    lastServiceDate: "2025-01-10",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2027-01-10",
-    status: "NORMAL"
-  },
-  tire: {
-    lastServiceOdo: 60000,
-    lastServiceDate: "2025-06-01",
-    nextServiceOdo: 100000,
-    nextServiceDate: "2028-06-01",
-    status: "NORMAL"
-  }
+  oil_engine: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 10000, nextServiceDate: "", status: "NORMAL" },
+  oil_filter: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 10000, nextServiceDate: "", status: "NORMAL" },
+  air_filter: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 20000, nextServiceDate: "", status: "NORMAL" },
+  coolant: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 40000, nextServiceDate: "", status: "NORMAL" },
+  spark_plug: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 30000, nextServiceDate: "", status: "NORMAL" },
+  transmission_oil: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 40000, nextServiceDate: "", status: "NORMAL" },
+  brake_fluid: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 20000, nextServiceDate: "", status: "NORMAL" },
+  brake_pad: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 30000, nextServiceDate: "", status: "NORMAL" },
+  battery: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 50000, nextServiceDate: "", status: "NORMAL" },
+  tire: { lastServiceOdo: 0, lastServiceDate: "", nextServiceDate: "", nextServiceOdo: 40000, status: "NORMAL" }
 };
 
-// Seeded realistic service history
-export const DEFAULT_SERVICE_HISTORY = [
-  {
-    id: "srv_demo_01",
-    type: "oil_engine",
-    typeName: "Engine Oil & Filter Service",
-    odo: 80000,
-    date: "2026-06-25",
-    notes: "Full synthetic 5W-30 engine oil replaced, OEM filter installed. Engine sounds smooth.",
-    items: ["Engine Oil", "Oil Filter"],
-    photoProof: ""
-  },
-  {
-    id: "srv_demo_02",
-    type: "air_filter",
-    typeName: "Air & Cabin Filter Replacement",
-    odo: 60000,
-    date: "2026-04-10",
-    notes: "High-flow air filter cleaned and replaced. Improved throttle response.",
-    items: ["Air Filter"],
-    photoProof: ""
-  },
-  {
-    id: "srv_demo_03",
-    type: "brake_fluid",
-    typeName: "Brake System Flushing",
-    odo: 80000,
-    date: "2026-02-14",
-    notes: "DOT4 brake fluid flushed and bled on all 4 calipers. Firm pedal feel restored.",
-    items: ["Brake Fluid"],
-    photoProof: ""
-  }
-];
+// Clean service history (no dummy records)
+export const DEFAULT_SERVICE_HISTORY = [];
 
 class MaintenanceEngine {
   constructor() {
     this.settings = this.loadLocal('scada_maintenance_settings', DEFAULT_MAINTENANCE_SETTINGS);
     this.state = this.loadLocal('scada_maintenance_state', DEFAULT_MAINTENANCE_STATE);
     this.history = this.loadLocal('scada_service_history', DEFAULT_SERVICE_HISTORY);
-    this.currentOdo = 97245;
+    this.currentOdo = 0;
   }
 
   loadLocal(key, fallback) {
     try {
       const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : JSON.parse(JSON.stringify(fallback));
+      if (data) {
+        const parsed = JSON.parse(data);
+        // If it contains old demo dummy items, reset to clean fallback
+        if (key === 'scada_service_history' && Array.isArray(parsed) && parsed.some(x => x.id && x.id.startsWith('srv_demo'))) {
+          localStorage.removeItem(key);
+          return fallback;
+        }
+        return parsed;
+      }
+      return JSON.parse(JSON.stringify(fallback));
     } catch (e) {
       return JSON.parse(JSON.stringify(fallback));
     }
