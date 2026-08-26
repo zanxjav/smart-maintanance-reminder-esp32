@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initClock();
   setupUIEvents();
   setupSpeedLimiterModal();
+  setupEditIntervalModal();
   setupConnectionModal();
   populateServiceModalDropdown();
   renderMaintenanceReminders();
@@ -226,24 +227,40 @@ function renderMaintenanceReminders() {
   const fullContainer = document.getElementById('fullMaintenanceListContainer');
   if (fullContainer) {
     fullContainer.innerHTML = allCards.map(item => `
-      <div class="modal-service-card" data-key="${item.key}" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.9rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
-        <div>
-          <div style="font-weight: 700; font-size: 0.92rem; color: #0f172a;">${item.name}</div>
-          <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Interval: ${maintenanceEngine.formatNumber(item.intervalKm)} KM / ${item.intervalMonths} Bulan</div>
-          <div style="font-size: 0.76rem; color: #64748b;">Berikutnya: ${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</div>
+      <div class="modal-service-card" data-key="${item.key}" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); padding: 1rem; border-radius: 14px; display: flex; flex-direction: column; gap: 0.75rem; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: #ffffff;">${item.name}</div>
+            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 3px;">Interval: <strong style="color: #38bdf8;">${maintenanceEngine.formatNumber(item.intervalKm)} KM</strong> / <strong style="color: #38bdf8;">${item.intervalMonths} Bulan</strong></div>
+            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 1px;">Berikutnya: ${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM (${item.nextServiceDate || '-'})</div>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 6px; background: ${item.status === 'DUE' ? 'rgba(239,68,68,0.18)' : (item.status === 'WARNING' ? 'rgba(245,158,11,0.18)' : 'rgba(16,185,129,0.18)')}; color: ${item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981')};">${item.status}</span>
+            <div style="font-size: 0.76rem; font-weight: 600; color: #cbd5e1; margin-top: 4px;">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : 'Jatuh tempo'}</div>
+          </div>
         </div>
-        <div style="text-align: right;">
-          <span style="font-weight: 700; font-size: 0.85rem; padding: 0.2rem 0.55rem; border-radius: 6px; background: ${item.status === 'DUE' ? '#fef2f2' : (item.status === 'WARNING' ? '#fffbeb' : '#ecfdf5')}; color: ${item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981')};">${item.status}</span>
-          <div style="font-size: 0.76rem; font-weight: 600; color: #334155; margin-top: 4px;">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : 'Jatuh tempo'}</div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.06);">
+          <button type="button" class="btn-sec btn-edit-interval-item" data-key="${item.key}" style="padding: 0.35rem 0.75rem; font-size: 0.76rem; border-radius: 8px;">⚙️ Ubah Interval</button>
+          <button type="button" class="btn-pri btn-log-service-item" data-key="${item.key}" style="padding: 0.35rem 0.85rem; font-size: 0.76rem; border-radius: 8px;">+ Catat Servis</button>
         </div>
       </div>
     `).join('');
 
-    // Attach click to open service log
-    fullContainer.querySelectorAll('.modal-service-card').forEach(card => {
-      card.addEventListener('click', () => {
+    // Attach click triggers
+    fullContainer.querySelectorAll('.btn-edit-interval-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         closeAllModals();
-        openServiceModal(card.dataset.key);
+        openEditIntervalModal(btn.dataset.key);
+      });
+    });
+
+    fullContainer.querySelectorAll('.btn-log-service-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeAllModals();
+        openServiceModal(btn.dataset.key);
       });
     });
   }
@@ -413,10 +430,86 @@ async function handleServiceFormSubmit(e) {
   const items = [];
   document.querySelectorAll('.part-cb:checked').forEach(cb => items.push(cb.value));
 
-  await maintenanceEngine.logService({ type, odo: Number(odo), date, notes, items });
   closeAllModals();
+  await maintenanceEngine.logService({ type, odo: Number(odo), date, notes, items });
   renderMaintenanceReminders();
   showToast('Catatan servis berhasil disimpan!', 'success');
+}
+
+/* ==========================================================================
+   EDIT INTERVAL CONTROLLER (SUPER FAST & SMOOTH)
+   ========================================================================== */
+function openEditIntervalModal(key) {
+  const modal = document.getElementById('modalEditInterval');
+  if (!modal) return;
+
+  const setting = maintenanceEngine.settings[key];
+  if (!setting) return;
+
+  const titleEl = document.getElementById('editIntervalTitle');
+  const keyInput = document.getElementById('editIntervalKey');
+  const kmInput = document.getElementById('editIntervalKm');
+  const moInput = document.getElementById('editIntervalMonths');
+
+  if (titleEl) titleEl.textContent = `Ubah Interval: ${setting.name}`;
+  if (keyInput) keyInput.value = key;
+  if (kmInput) kmInput.value = setting.intervalKm;
+  if (moInput) moInput.value = setting.intervalMonths;
+
+  // Highlight active preset buttons
+  document.querySelectorAll('.btn-preset-km').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(setting.intervalKm));
+  });
+  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(setting.intervalMonths));
+  });
+
+  modal.classList.add('open');
+}
+
+function setupEditIntervalModal() {
+  const form = document.getElementById('formEditInterval');
+  const kmInput = document.getElementById('editIntervalKm');
+  const moInput = document.getElementById('editIntervalMonths');
+
+  // Preset KM buttons
+  document.querySelectorAll('.btn-preset-km').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (kmInput) kmInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-preset-km').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Preset Month buttons
+  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (moInput) moInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-preset-mo').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = document.getElementById('editIntervalKey').value;
+      const intervalKm = Number(kmInput.value) || 20000;
+      const intervalMonths = Number(moInput.value) || 6;
+
+      const itemName = maintenanceEngine.settings[key] ? maintenanceEngine.settings[key].name : 'Item';
+
+      // 1. Instantly close modal (0ms UI latency)
+      closeAllModals();
+
+      // 2. Synchronous in-memory & local state update
+      await maintenanceEngine.updateSetting(key, { intervalKm, intervalMonths });
+
+      // 3. Instantly re-render dashboard (60fps)
+      renderMaintenanceReminders();
+
+      // 4. Show success toast
+      showToast(`Interval ${itemName} diubah ke ${maintenanceEngine.formatNumber(intervalKm)} KM / ${intervalMonths} Bulan!`, 'success');
+    });
+  }
 }
 
 function updateConnectionBadge(connected) {

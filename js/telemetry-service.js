@@ -222,7 +222,7 @@ export function subscribeConnectionStatus(callback) {
 }
 
 /**
- * Save Speed Limit to Firebase RTDB & Local Storage
+ * Save Speed Limit to Firebase RTDB & Local Storage (Instant & Non-blocking)
  */
 export async function writeSpeedLimit(speedLimitVal) {
   const val = Number(speedLimitVal);
@@ -232,76 +232,100 @@ export async function writeSpeedLimit(speedLimitVal) {
 
   dispatchLocalUpdate('speedLimit', val);
 
-  // Sync directly to Firebase Realtime Database
-  try {
-    await fetch(`${FIREBASE_DB_URL}/settings/speedLimit.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(val)
-    });
-  } catch (err) {
-    console.warn('[Firebase] Failed to write speed limit to cloud:', err);
-  }
+  // Background non-blocking sync to Firebase Realtime Database
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  fetch(`${FIREBASE_DB_URL}/settings/speedLimit.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(val),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background speedLimit sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
 
   return { success: true, speedLimit: val };
 }
 
 /**
- * Reset Trip Meter in Firebase
+ * Reset Trip Meter in Firebase (Instant & Non-blocking)
  */
 export async function writeResetTrip() {
+  currentTelemetryState.trip = 0.0;
   dispatchLocalUpdate('vehicle', { trip: 0.0 });
-  try {
-    await fetch(`${FIREBASE_DB_URL}/vehicle/current/trip.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(0.0)
-    });
-  } catch (e) {}
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  fetch(`${FIREBASE_DB_URL}/vehicle/current/trip.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(0.0),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background trip reset sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
   return { success: true, trip: 0.0 };
 }
 
 /**
- * Save Service History Record
+ * Save Service History Record (Instant & Non-blocking)
  */
 export async function writeServiceRecord(record) {
-  try {
-    const history = getStoredServiceHistory();
-    history.unshift({
-      id: Date.now().toString(),
-      ...record,
-      timestamp: new Date().toISOString()
-    });
-    localStorage.setItem(STORAGE_SERVICE_HISTORY, JSON.stringify(history));
+  const history = getStoredServiceHistory();
+  history.unshift({
+    id: Date.now().toString(),
+    ...record,
+    timestamp: new Date().toISOString()
+  });
 
-    // Sync to Firebase RTDB Cloud
-    await fetch(`${FIREBASE_DB_URL}/maintenance/history.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(history)
-    });
-  } catch (e) {
-    console.warn("Could not persist service record:", e);
-  }
+  try {
+    localStorage.setItem(STORAGE_SERVICE_HISTORY, JSON.stringify(history));
+  } catch (e) {}
+
   dispatchLocalUpdate('history', record);
+
+  // Background non-blocking sync to Firebase RTDB Cloud
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+  fetch(`${FIREBASE_DB_URL}/maintenance/history.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(history),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background history sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
   return { success: true };
 }
 
 /**
- * Save Custom Maintenance Settings
+ * Save Custom Maintenance Settings (Instant & Non-blocking)
  */
 export async function writeMaintenanceSettings(settingsMap) {
   try {
     localStorage.setItem(STORAGE_MAINTENANCE_SETTINGS, JSON.stringify(settingsMap));
-    await fetch(`${FIREBASE_DB_URL}/maintenance/settings.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settingsMap)
-    });
-  } catch (e) {
-    console.warn("Could not persist maintenance settings:", e);
-  }
+  } catch (e) {}
+
   dispatchLocalUpdate('settings', settingsMap);
+
+  // Background non-blocking sync to Firebase RTDB Cloud
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+  fetch(`${FIREBASE_DB_URL}/maintenance/settings.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settingsMap),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background settings sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
   return { success: true };
 }
 
