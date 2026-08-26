@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <time.h>
 
 // ============================================================
 // 1. KONFIGURASI WIFI & FIREBASE REST API
@@ -41,9 +42,9 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 #define MIN_MOVE_METERS          2.0
 #define UTC_OFFSET_HOURS         7
 
-#define OLED_UPDATE_INTERVAL_MS  150
+#define OLED_UPDATE_INTERVAL_MS  100     // Refresh rate OLED 10 FPS
 #define LED_BLINK_INTERVAL_MS    300
-#define WEB_SEND_INTERVAL_MS     1000    // Kirim data tiap 1 detik
+#define WEB_SEND_INTERVAL_MS     1000    // Kirim data ke Web tiap 1 detik
 #define WEB_SYNC_INTERVAL_MS     2500    // Cek limit dari web tiap 2.5 detik
 #define DEBUG_PRINT_INTERVAL_MS  1000
 
@@ -81,9 +82,10 @@ unsigned long lastWebSendMs    = 0;
 unsigned long lastWebSyncMs    = 0;
 bool blinkState = false;
 
-int  wibDay, wibMonth, wibYear;
-int  wibHour, wibMinute, wibSecond;
+int  wibDay = 1, wibMonth = 1, wibYear = 2026;
+int  wibHour = 0, wibMinute = 0, wibSecond = 0;
 bool dateTimeValid = false;
+bool timeSyncStarted = false;
 
 const char* MONTH_NAMES[] = {
   "JAN","FEB","MAR","APR","MEI","JUN",
@@ -91,7 +93,74 @@ const char* MONTH_NAMES[] = {
 };
 
 // ============================================================
-// 6. WIFI STATE MANAGEMENT (SUPER CEPAT & NON-BLOCKING)
+// 6. NTP TIME SYNC (INSTAN REAL-TIME DARI INTERNET / WIB)
+// ============================================================
+void startTimeSync() {
+    if (timeSyncStarted) return;
+    // GMT+7 (7 * 3600 detik) untuk WIB
+    configTime(7 * 3600, 0, "pool.ntp.org", "time.google.com", "id.pool.ntp.org");
+    timeSyncStarted = true;
+    Serial.println(F("[TIME] NTP Time Sync Dimulai (GMT+7 WIB)..."));
+}
+
+int daysInMonth(int month, int year) {
+    static const int table[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (month == 2) {
+        bool leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+        return leap ? 29 : 28;
+    }
+    return table[month - 1];
+}
+
+void updateDateTime() {
+    // 1. Prioritas Utama: NTP Internet Clock (Presisi Detik & Pasti Realtime)
+    time_t now = time(nullptr);
+    if (now > 1700000000) { // Waktu epoch valid (tahun > 2023)
+        struct tm timeinfo;
+        localtime_r(&now, &timeinfo);
+        wibYear   = timeinfo.tm_year + 1900;
+        wibMonth  = timeinfo.tm_mon + 1;
+        wibDay    = timeinfo.tm_mday;
+        wibHour   = timeinfo.tm_hour;
+        wibMinute = timeinfo.tm_min;
+        wibSecond = timeinfo.tm_sec;
+        dateTimeValid = true;
+        return;
+    }
+
+    // 2. Fallback: GPS Atomic Clock (Jika tidak ada koneksi internet)
+    if (gps.time.isValid() && gps.date.isValid() && gps.date.year() >= 2024) {
+        int hour  = gps.time.hour() + UTC_OFFSET_HOURS;
+        int day   = gps.date.day();
+        int month = gps.date.month();
+        int year  = gps.date.year();
+
+        if (hour >= 24) {
+            hour -= 24;
+            day += 1;
+            int maxDay = daysInMonth(month, year);
+            if (day > maxDay) {
+                day = 1;
+                month += 1;
+                if (month > 12) {
+                    month = 1;
+                    year += 1;
+                }
+            }
+        }
+
+        wibHour   = hour;
+        wibMinute = gps.time.minute();
+        wibSecond = gps.time.second();
+        wibDay    = day;
+        wibMonth  = month;
+        wibYear   = year;
+        dateTimeValid = true;
+    }
+}
+
+// ============================================================
+// 7. WIFI STATE MANAGEMENT (SUPER CEPAT & NON-BLOCKING)
 // ============================================================
 enum WifiState { WIFI_IDLE, WIFI_CONNECTING, WIFI_CONNECTED };
 WifiState wifiState = WIFI_IDLE;
@@ -128,6 +197,7 @@ void updateWifi() {
                 Serial.print("[WIFI] IP: ");
                 Serial.println(WiFi.localIP());
                 wifiState = WIFI_CONNECTED;
+                startTimeSync(); // Langsung sync jam WIB real-time
             } else {
                 if (millis() - dotTimer > 500) {
                     Serial.print(".");
@@ -147,13 +217,14 @@ void updateWifi() {
                 Serial.println("\n[WIFI] Terputus! Reconnecting...");
                 wifiState = WIFI_IDLE;
                 wifiRetry = millis();
+                timeSyncStarted = false;
             }
             break;
     }
 }
 
 // ============================================================
-// 7. KOMUNIKASI RINGAN KE FIREBASE WEB (REST API - ZERO LAG)
+// 8. KOMUNIKASI RINGAN KE FIREBASE WEB (REST API - ZERO LAG)
 // ============================================================
 void sendTelemetryToWeb() {
     if (wifiState != WIFI_CONNECTED) return;
@@ -172,6 +243,15 @@ void sendTelemetryToWeb() {
     http.addHeader("Content-Type", "application/json");
     http.setTimeout(1200);
 
+    char timeStr[12], dateStr[16];
+    if (dateTimeValid) {
+        snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", wibYear, wibMonth, wibDay);
+        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", wibHour, wibMinute, wibSecond);
+    } else {
+        snprintf(dateStr, sizeof(dateStr), "--");
+        snprintf(timeStr, sizeof(timeStr), "--:--:--");
+    }
+
     String json = "{";
     json += "\"speed\":" + String((int)(currentSpeed + 0.5)) + ",";
     json += "\"rawSpeed\":" + String(currentSpeed, 1) + ",";
@@ -181,24 +261,15 @@ void sendTelemetryToWeb() {
     json += "\"gps\":\"" + String(gpsFix ? "Connected" : "No Signal") + "\",";
     json += "\"esp32\":\"Online\",";
     json += "\"status\":\"" + String(overSpeedActive ? "Warning" : "Normal") + "\",";
-
-    if (dateTimeValid) {
-        char timeStr[10], dateStr[14];
-        snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", wibYear, wibMonth, wibDay);
-        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", wibHour, wibMinute, wibSecond);
-        json += "\"date\":\"" + String(dateStr) + "\",";
-        json += "\"time\":\"" + String(timeStr) + "\",";
-        json += "\"lastUpdate\":\"" + String(timeStr) + "\",";
-    } else {
-        json += "\"lastUpdate\":\"--:--:--\",";
-    }
-
+    json += "\"date\":\"" + String(dateStr) + "\",";
+    json += "\"time\":\"" + String(timeStr) + "\",";
+    json += "\"lastUpdate\":\"" + String(timeStr) + "\",";
     json += "\"lat\":" + String(gps.location.lat(), 6) + ",";
     json += "\"lng\":" + String(gps.location.lng(), 6) + ",";
     json += "\"satellites\":" + String(gps.satellites.value());
     json += "}";
 
-    int httpCode = http.PATCH(json);
+    http.PATCH(json);
     http.end();
 }
 
@@ -231,7 +302,7 @@ void syncSpeedLimitFromWeb() {
 }
 
 // ============================================================
-// 8. GPS & SPEED
+// 9. GPS & SPEED
 // ============================================================
 void readGPS() {
     while (gpsSerial.available() > 0) {
@@ -286,28 +357,6 @@ void maybeSaveOdo() {
     }
 }
 
-void updateDateTime() {
-    if (!gps.time.isValid() || !gps.date.isValid()) return;
-
-    int hour  = gps.time.hour() + UTC_OFFSET_HOURS;
-    int day   = gps.date.day();
-    int month = gps.date.month();
-    int year  = gps.date.year();
-
-    if (hour >= 24) {
-        hour -= 24;
-        day += 1;
-    }
-
-    wibHour   = hour;
-    wibMinute = gps.time.minute();
-    wibSecond = gps.time.second();
-    wibDay    = day;
-    wibMonth  = month;
-    wibYear   = year;
-    dateTimeValid = true;
-}
-
 void updateWarning() {
     overSpeedActive = gpsFix && (currentSpeed > speedLimit);
 }
@@ -327,7 +376,7 @@ void updateLED() {
 }
 
 // ============================================================
-// 9. OLED DISPLAY
+// 10. OLED DISPLAY (DENGAN JAM & TANGGAL REALTIME)
 // ============================================================
 void printCentered(const char* text, int y, int textSize) {
     display.setTextSize(textSize);
@@ -345,6 +394,7 @@ void updateOLED() {
 
     display.clearDisplay();
 
+    // Baris Header: Tanggal, Indikator WiFi & Jam Menit Detik
     display.setTextSize(1);
     char dateStr[14], timeStr[10];
     if (dateTimeValid) {
@@ -367,6 +417,7 @@ void updateOLED() {
     display.setCursor(SCREEN_WIDTH - w, 0);
     display.print(timeStr);
 
+    // Kecepatan
     if (!(overSpeedActive && !blinkState)) {
         char speedStr[6];
         if (gpsFix) snprintf(speedStr, sizeof(speedStr), "%d", (int)(currentSpeed + 0.5));
@@ -376,6 +427,7 @@ void updateOLED() {
 
     printCentered(gpsFix ? "KM/H" : "NO GPS", 47, 1);
 
+    // ODO & TRIP
     char odoStr[20], tripStr[20];
     snprintf(odoStr, sizeof(odoStr), "ODO %ld", (long)odoKm);
     snprintf(tripStr, sizeof(tripStr), "TRIP %.1f", tripKm);
@@ -389,7 +441,7 @@ void updateOLED() {
 }
 
 // ============================================================
-// 10. SETUP & MAIN LOOP
+// 11. SETUP & MAIN LOOP
 // ============================================================
 void setup() {
     Serial.begin(115200);
@@ -410,7 +462,7 @@ void setup() {
     preferences.begin("speedo", false);
     loadOdo();
 
-    Serial.println(F("=== SPEEDOMETER & LIGHTWEIGHT WEB READY ==="));
+    Serial.println(F("=== SPEEDOMETER & REALTIME NTP CLOCK READY ==="));
 
     wifiRetry = millis() - 2000;
     wifiState = WIFI_IDLE;
