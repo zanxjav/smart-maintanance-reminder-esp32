@@ -5,23 +5,17 @@
 #include <HardwareSerial.h>
 #include <Preferences.h>
 #include <WiFi.h>
-#include <Firebase_ESP_Client.h>
-
-// Firebase Helper Addons
-#include <addons/TokenHelper.h>
-#include <addons/RTDBHelper.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
 
 // ============================================================
-// KONFIGURASI WIFI & FIREBASE REALTIME DATABASE
+// KONFIGURASI WIFI LANGSUNG (DIRECT FAST WIFI)
 // ============================================================
-#define WIFI_SSID       "NAMA_WIFI_ANDA"
-#define WIFI_PASSWORD   "PASSWORD_WIFI_ANDA"
-
-#define API_KEY         "AIzaSyD-YOUR_FIREBASE_WEB_API_KEY"
-#define DATABASE_URL    "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com/" // Pastikan diakhiri '/'
+const char* WIFI_SSID     = "GALAXY A33 5G";
+const char* WIFI_PASSWORD = "cicing77";
 
 // ============================================================
-// PIN CONFIGURATION (ESP32-C3)
+// PIN CONFIGURATION (ESP32-C3 / ESP32 Standar)
 // ============================================================
 #define GPS_RX_PIN      20   // ESP32-C3 RX <-- NEO-6M TX
 #define GPS_TX_PIN      21   // ESP32-C3 TX --> NEO-6M RX
@@ -37,21 +31,16 @@
 #define ORANGE_LED_PIN  4
 
 // ============================================================
-// KONFIGURASI UTAMA & DEFAULT
+// KONFIGURASI DEFAULT & TIMING
 // ============================================================
-#define DEFAULT_SPEED_LIMIT 60.0    // Nilai default awal jika belum diset dari web
-#define INITIAL_ODO_KM      97000.0 // Odometer awal (jika belum ada di Flash)
-#define MIN_MOVE_METERS     2.0     // Filter jitter GPS saat diam
-#define UTC_OFFSET_HOURS    7       // WIB = UTC+7
+#define DEFAULT_SPEED_LIMIT 60.0
+#define INITIAL_ODO_KM      97000.0
+#define MIN_MOVE_METERS     2.0
+#define UTC_OFFSET_HOURS    7
 
-// ============================================================
-// KONFIGURASI TIMING (Semua Non-Blocking millis())
-// ============================================================
 #define OLED_UPDATE_INTERVAL_MS      150
 #define LED_BLINK_INTERVAL_MS        300
 #define DEBUG_PRINT_INTERVAL_MS      1000
-#define FIREBASE_SEND_INTERVAL_MS    1000   // Kirim telemetri ke web tiap 1 detik
-#define FIREBASE_SYNC_LIMIT_MS       2000   // Cek update speed limit dari web tiap 2 detik
 
 #define ODO_SAVE_DISTANCE_KM         0.5
 #define ODO_SAVE_INTERVAL_MS         60000UL
@@ -65,13 +54,7 @@ TinyGPSPlus gps;
 HardwareSerial gpsSerial(1);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Preferences preferences;
-
-// Objek Firebase
-FirebaseData fbdoData;
-FirebaseData fbdoStream;
-FirebaseAuth auth;
-FirebaseConfig config;
-bool isFirebaseReady = false;
+WebServer server(80);
 
 // ============================================================
 // STATE GLOBAL
@@ -90,15 +73,15 @@ bool   hasLastPosition = false;
 double odoAtLastSave = INITIAL_ODO_KM;
 unsigned long lastOdoSaveMs = 0;
 
-unsigned long lastOledUpdateMs   = 0;
-unsigned long lastBlinkMs        = 0;
-unsigned long lastFirebaseSendMs = 0;
-unsigned long lastLimitSyncMs    = 0;
+unsigned long lastOledUpdateMs = 0;
+unsigned long lastBlinkMs      = 0;
 bool blinkState = false;
 
 int  wibDay, wibMonth, wibYear;
 int  wibHour, wibMinute, wibSecond;
 bool dateTimeValid = false;
+
+String espIP = "0.0.0.0";
 
 const char* MONTH_NAMES[] = {
   "JAN","FEB","MAR","APR","MEI","JUN",
@@ -106,10 +89,10 @@ const char* MONTH_NAMES[] = {
 };
 
 // ============================================================
-// DEKLARASI FUNGSI
+// PROTOTYPE FUNGSI
 // ============================================================
 void initWiFi();
-void initFirebase();
+void setupWebServer();
 void readGPS();
 void updateSpeed();
 void updateTripAndOdo();
@@ -130,8 +113,6 @@ void saveOdo();
 void loadOdo();
 void maybeSaveOdo();
 void resetTrip();
-void syncSpeedLimitFromFirebase();
-void sendTelemetryToFirebase();
 void debugPrint();
 
 // ============================================================
@@ -149,41 +130,44 @@ void setup() {
 
   Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-    Serial.println(F("OLED tidak terdeteksi!"));
+    Serial.println(F("OLED Gagal Inisialisasi!"));
     while (true) {
       digitalWrite(GREEN_LED_PIN, HIGH);
       digitalWrite(ORANGE_LED_PIN, HIGH);
-      delay(400);
+      delay(300);
       digitalWrite(GREEN_LED_PIN, LOW);
       digitalWrite(ORANGE_LED_PIN, LOW);
-      delay(400);
+      delay(300);
     }
   }
 
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  display.setCursor(10, 20);
+  display.setCursor(0, 15);
+  display.println(F("Vehicle Monitor"));
+  display.setCursor(0, 30);
   display.println(F("Connecting WiFi..."));
   display.display();
 
   preferences.begin("speedo", false);
   loadOdo();
 
-  // Inisialisasi Koneksi WiFi & Firebase
+  // Koneksi WiFi Berkecepatan Tinggi
   initWiFi();
-  initFirebase();
 
-  Serial.println(F("=== Digital Vehicle Speedometer & IoT SCADA ==="));
-  Serial.print(F("ODO Awal: "));
-  Serial.print(odoKm, 2);
-  Serial.println(F(" km"));
+  // Inisialisasi WebServer & mDNS
+  setupWebServer();
+
+  Serial.println(F("\n=== ESP32 Direct Vehicle Monitor Ready ==="));
+  Serial.printf("Akses Web Dashboard di browser: http://%s atau http://vehicle.local\n", espIP.c_str());
 }
 
 // ============================================================
 // LOOP NON-BLOCKING
 // ============================================================
 void loop() {
+  server.handleClient(); // Handle request dari Web Dashboard secara instan
   readGPS();
   updateSpeed();
   updateTripAndOdo();
@@ -191,121 +175,135 @@ void loop() {
   updateWarning();
   updateLED();
   updateOLED();
-
-  // Sinkronisasi Data Web & IoT
-  if (Firebase.ready() && isFirebaseReady) {
-    syncSpeedLimitFromFirebase();
-    sendTelemetryToFirebase();
-  }
-
   debugPrint();
 }
 
 // ============================================================
-// INISIALISASI WIFI & FIREBASE
+// INISIALISASI WIFI & WEB SERVER (ULTRA LOW LATENCY)
 // ============================================================
 void initWiFi() {
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false); // Nonaktifkan power saving WiFi untuk latensi terendah
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print(F("Menghubungkan ke WiFi "));
   
-  unsigned long startAttemptTime = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
-    delay(300);
+  Serial.print(F("Menghubungkan ke "));
+  Serial.print(WIFI_SSID);
+
+  unsigned long startMs = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startMs < 10000) {
+    delay(200);
     Serial.print(F("."));
   }
 
+  display.clearDisplay();
+  display.setCursor(0, 10);
+
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(F("\n[WiFi] Terhubung! IP: "));
-    Serial.println(WiFi.localIP());
+    espIP = WiFi.localIP().toString();
+    Serial.println(F("\n[WiFi] Terhubung!"));
+    Serial.print(F("[WiFi] IP Address: "));
+    Serial.println(espIP);
+
+    if (MDNS.begin("vehicle")) {
+      Serial.println(F("[mDNS] Responder aktif: http://vehicle.local"));
+    }
+
+    display.println(F("WiFi Connected!"));
+    display.setCursor(0, 25);
+    display.print(F("IP: "));
+    display.println(espIP);
+    display.setCursor(0, 40);
+    display.println(F("http://vehicle.local"));
+    display.display();
+    delay(1500);
   } else {
-    Serial.println(F("\n[WiFi] Gagal terhubung. Menjalankan mode offline sementara."));
+    Serial.println(F("\n[WiFi] Gagal terhubung, mode offline aktif."));
+    display.println(F("WiFi Disconnected"));
+    display.setCursor(0, 25);
+    display.println(F("Running Standalone"));
+    display.display();
+    delay(1000);
   }
 }
 
-void initFirebase() {
-  if (WiFi.status() != WL_CONNECTED) return;
-
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-
-  // Anonymous Sign In
-  if (Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println(F("[Firebase] SignUp Anonymous Berhasil!"));
-    isFirebaseReady = true;
-  } else {
-    Serial.printf("[Firebase] SignUp Gagal: %s\n", config.signer.signupError.message.c_str());
-  }
-
-  config.token_status_callback = tokenStatusCallback;
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
-
-  // Set buffer size
-  fbdoData.setBSSLBufferSize(1024, 1024);
-  fbdoData.setResponseSize(1024);
-}
-
 // ============================================================
-// SINKRONISASI FIREBASE (SPEED LIMIT & TELEMETRI)
+// REST API ENDPOINTS UNTUK WEB DASHBOARD
 // ============================================================
-void syncSpeedLimitFromFirebase() {
-  unsigned long now = millis();
-  if (now - lastLimitSyncMs < FIREBASE_SYNC_LIMIT_MS) return;
-  lastLimitSyncMs = now;
+void setupWebServer() {
+  // 1. Endpoint Realtime Telemetry JSON (GET /api/telemetry)
+  server.on("/api/telemetry", HTTP_GET, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+    server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate");
 
-  // Baca Speed Limit yang diubah user dari Web Dashboard
-  if (Firebase.RTDB.getInt(&fbdoData, "/settings/speedLimit")) {
-    if (fbdoData.dataType() == "int" || fbdoData.dataType() == "float") {
-      int newLimit = fbdoData.intData();
-      if (newLimit >= 20 && newLimit <= 180 && newLimit != (int)speedLimit) {
+    char dateStr[14] = "--";
+    char timeStr[10] = "--";
+    if (dateTimeValid) {
+      snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", wibYear, wibMonth, wibDay);
+      snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", wibHour, wibMinute, wibSecond);
+    }
+
+    String json = "{";
+    json += "\"speed\":" + String((int)(currentSpeed + 0.5)) + ",";
+    json += "\"rawSpeed\":" + String(currentSpeed, 1) + ",";
+    json += "\"odo\":" + String((long)odoKm) + ",";
+    json += "\"trip\":" + String(tripKm, 2) + ",";
+    json += "\"speedLimit\":" + String((int)speedLimit) + ",";
+    json += "\"gps\":\"" + String(gpsFix ? "Connected" : "No Signal") + "\",";
+    json += "\"esp32\":\"Online\",";
+    json += "\"status\":\"" + String(overSpeedActive ? "Warning" : "Normal") + "\",";
+    json += "\"date\":\"" + String(dateStr) + "\",";
+    json += "\"time\":\"" + String(timeStr) + "\",";
+    json += "\"lastUpdate\":\"" + String(timeStr) + "\",";
+    json += "\"lat\":" + String(gps.location.lat(), 6) + ",";
+    json += "\"lng\":" + String(gps.location.lng(), 6) + ",";
+    json += "\"satellites\":" + String(gps.satellites.value()) + ",";
+    json += "\"ip\":\"" + espIP + "\"";
+    json += "}";
+
+    server.send(200, "application/json", json);
+  });
+
+  // 2. Endpoint Ubah Speed Limit Langsung dari Web (GET /api/speedlimit?val=80)
+  server.on("/api/speedlimit", HTTP_ANY, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+
+    if (server.hasArg("val")) {
+      int newLimit = server.arg("val").toInt();
+      if (newLimit >= 20 && newLimit <= 180) {
         speedLimit = (double)newLimit;
-        Serial.printf("[IoT] Speed Limit Diperbarui dari Web: %.0f KM/H\n", speedLimit);
+        Serial.printf("[REST API] Speed Limit Diubah ke: %.0f KM/H\n", speedLimit);
+        server.send(200, "application/json", "{\"success\":true,\"speedLimit\":" + String((int)speedLimit) + "}");
+        return;
       }
     }
-  }
-}
+    server.send(400, "application/json", "{\"success\":false,\"error\":\"Nilai limit tidak valid\"}");
+  });
 
-void sendTelemetryToFirebase() {
-  unsigned long now = millis();
-  if (now - lastFirebaseSendMs < FIREBASE_SEND_INTERVAL_MS) return;
-  lastFirebaseSendMs = now;
+  // 3. Endpoint Reset Trip Meter Langsung dari Web (GET /api/resettrip)
+  server.on("/api/resettrip", HTTP_ANY, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+    resetTrip();
+    Serial.println(F("[REST API] Trip Meter Direset!"));
+    server.send(200, "application/json", "{\"success\":true,\"trip\":0.0}");
+  });
 
-  // Bentuk payload JSON yang sesuai persis dengan ekspektasi Web Dashboard
-  FirebaseJson json;
-  json.set("speed", (int)(currentSpeed + 0.5));
-  json.set("rawSpeed", currentSpeed);
-  json.set("odo", (long)odoKm);
-  json.set("trip", tripKm);
-  json.set("speedLimit", (int)speedLimit);
-  json.set("gps", gpsFix ? "Connected" : "No Signal");
-  json.set("esp32", "Online");
-  json.set("status", overSpeedActive ? "Warning" : "Normal");
+  // 4. CORS Options Preflight Handler
+  server.onNotFound([]() {
+    if (server.method() == HTTP_OPTIONS) {
+      server.sendHeader("Access-Control-Allow-Origin", "*");
+      server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      server.sendHeader("Access-Control-Allow-Headers", "*");
+      server.send(204);
+    } else {
+      server.send(404, "text/plain", "Not found");
+    }
+  });
 
-  if (dateTimeValid) {
-    char dateStr[14];
-    char timeStr[10];
-    snprintf(dateStr, sizeof(dateStr), "%04d-%02d-%02d", wibYear, wibMonth, wibDay);
-    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", wibHour, wibMinute, wibSecond);
-    json.set("date", dateStr);
-    json.set("time", timeStr);
-    json.set("lastUpdate", timeStr);
-  } else {
-    json.set("date", "--");
-    json.set("time", "--");
-    json.set("lastUpdate", "--");
-  }
-
-  json.set("lat", gps.location.lat());
-  json.set("lng", gps.location.lng());
-  json.set("satellites", gps.satellites.value());
-
-  // Kirim data ke node /vehicle/current (Metode Update/Set non-blocking)
-  if (Firebase.RTDB.updateNode(&fbdoData, "/vehicle/current", &json)) {
-    // Berhasil kirim
-  } else {
-    Serial.printf("[Firebase Error] %s\n", fbdoData.errorReason().c_str());
-  }
+  server.begin();
+  Serial.println(F("[HTTP] WebServer aktif di port 80"));
 }
 
 // ============================================================
@@ -568,7 +566,7 @@ void printCentered(const char* text, int y, int textSize) {
 }
 
 // ============================================================
-// DEBUG SERIAL MONITOR
+// DEBUG SERIAL
 // ============================================================
 void debugPrint() {
 #if DEBUG_SERIAL
@@ -577,7 +575,7 @@ void debugPrint() {
   if (now - lastDebugMs < DEBUG_PRINT_INTERVAL_MS) return;
   lastDebugMs = now;
 
-  Serial.print(F("WiFi:"));    Serial.print(WiFi.status() == WL_CONNECTED ? F("OK") : F("DISCONNECTED"));
+  Serial.print(F("WiFi:"));    Serial.print(WiFi.status() == WL_CONNECTED ? espIP : F("OFFLINE"));
   Serial.print(F(" | Sat:"));  Serial.print(gps.satellites.value());
   Serial.print(F(" | Fix:"));  Serial.print(gpsFix ? F("YES") : F("NO"));
   Serial.print(F(" | Spd:"));  Serial.print(currentSpeed, 1);

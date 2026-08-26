@@ -1,10 +1,22 @@
 /**
- * VEHICLE MONITOR - APP CONTROLLER (SUPER SMOOTH 60FPS)
+ * VEHICLE MONITOR - APP CONTROLLER (DIRECT ESP32 WIFI + ULTRA SMOOTH 60FPS)
  * 
  * High-performance, lightweight orchestrator for the Vehicle Monitor Dashboard.
  */
 
-import { initFirebaseService, subscribeVehicleData, subscribeSpeedLimit, subscribeMaintenanceStatus, subscribeServiceHistory, writeSpeedLimit, isFirebaseActive } from './firebase.js';
+import { 
+  initFirebaseService, 
+  subscribeVehicleData, 
+  subscribeSpeedLimit, 
+  subscribeMaintenanceStatus, 
+  subscribeServiceHistory, 
+  subscribeConnectionStatus,
+  writeSpeedLimit, 
+  writeResetTrip,
+  setEsp32Ip,
+  getEsp32Ip,
+  isFirebaseActive 
+} from './firebase.js';
 import { maintenanceEngine } from './maintenance-engine.js';
 import { demoSimulator } from './demo-simulator.js';
 
@@ -19,13 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initClock();
   setupUIEvents();
   setupSpeedLimiterModal();
+  setupConnectionModal();
   populateServiceModalDropdown();
   renderMaintenanceReminders();
 
-  // 2. Start Telemetry simulation immediately
+  // 2. Start Telemetry simulation by default until real ESP32 connects
   demoSimulator.start();
 
-  // 3. Subscriptions (Immediate Local Event Bus + Background Remote Sync)
+  // 3. Telemetry Subscriptions
   subscribeVehicleData((data) => {
     handleVehicleDataUpdate(data);
   });
@@ -45,17 +58,25 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMaintenanceReminders();
   });
 
-  // 4. Background Firebase Init (Doesn't block UI)
-  initFirebaseService().then(() => {
-    if (isFirebaseActive()) {
+  // 4. ESP32 Direct WiFi Status Listener
+  subscribeConnectionStatus(({ connected, ip }) => {
+    updateConnectionBadge(connected, ip);
+    if (connected) {
       demoSimulator.stop();
+      showToast(`Terhubung langsung ke ESP32 (${ip})`, 'success');
+    } else {
+      demoSimulator.start();
     }
-  }).catch(e => console.warn("Firebase fallback:", e));
+  });
+
+  // 5. Initialize Direct WiFi
+  initFirebaseService();
 });
 
 /* ==========================================================================
    TOP CLOCK FORMATTING
    ========================================================================== */
+
 function initClock() {
   const clockEl = document.getElementById('liveClockText');
   const update = () => {
@@ -404,6 +425,44 @@ async function handleServiceFormSubmit(e) {
   showToast('Catatan servis berhasil disimpan!', 'success');
 }
 
+function updateConnectionBadge(connected, ip) {
+  const dot = document.getElementById('esp32Dot');
+  const label = document.getElementById('esp32StatusLabel');
+  if (dot && label) {
+    if (connected) {
+      dot.className = 'status-indicator-dot online';
+      label.textContent = `ESP32 (${ip})`;
+    } else {
+      dot.className = 'status-indicator-dot offline';
+      label.textContent = 'Mode Simulasi';
+    }
+  }
+}
+
+function setupConnectionModal() {
+  const btn = document.getElementById('btnEsp32Status');
+  const modal = document.getElementById('modalEsp32Config');
+  const form = document.getElementById('formEsp32Config');
+  const inputIp = document.getElementById('inputEsp32Ip');
+
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (inputIp) inputIp.value = getEsp32Ip();
+      modal?.classList.add('open');
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newIp = inputIp?.value.trim() || 'vehicle.local';
+      setEsp32Ip(newIp);
+      closeAllModals();
+      showToast(`Menghubungkan ke ${newIp}...`, 'info');
+    });
+  }
+}
+
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
@@ -419,4 +478,5 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 250);
   }, 2800);
 }
+
 
