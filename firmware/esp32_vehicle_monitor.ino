@@ -67,6 +67,8 @@ double tripKm          = 0.0;
 double currentSpeed    = 0.0;
 bool   gpsFix          = false;
 bool   overSpeedActive = false;
+bool   flashTestActive = false;
+unsigned long flashTestEndMs = 0;
 
 double lastLat = 0.0;
 double lastLng = 0.0;
@@ -269,19 +271,20 @@ void sendTelemetryToWeb() {
     http.end();
 }
 
-void syncSpeedLimitFromWeb() {
+void syncCommandsFromWeb() {
     if (wifiState != WIFI_CONNECTED) return;
 
     unsigned long now = millis();
     if (now - lastWebSyncMs < WEB_SYNC_INTERVAL_MS) return;
     lastWebSyncMs = now;
 
+    // 1. Sync Speed Limit dari Web
     HTTPClient http;
     String url = String(FIREBASE_HOST) + "/settings/speedLimit.json";
     
     http.begin(firebaseClient, url);
     http.setReuse(true);
-    http.setTimeout(800);
+    http.setTimeout(700);
 
     int httpCode = http.GET();
     if (httpCode == 200) {
@@ -290,6 +293,36 @@ void syncSpeedLimitFromWeb() {
         if (newLimit >= 20 && newLimit <= 180 && newLimit != (int)speedLimit) {
             speedLimit = (double)newLimit;
             Serial.printf("[WEB] Speed Limit updated: %.0f KM/H\n", speedLimit);
+        }
+    }
+    http.end();
+
+    // 2. Sync Flash Test Command (Uji Coba Kedipan Lampu Oren Pin 4)
+    String flashUrl = String(FIREBASE_HOST) + "/commands/flashTest.json";
+    http.begin(firebaseClient, flashUrl);
+    http.setReuse(true);
+    http.setTimeout(700);
+
+    httpCode = http.GET();
+    if (httpCode == 200) {
+        String payload = http.getString();
+        if (payload.indexOf("\"active\":true") >= 0 || payload.indexOf("\"active\": true") >= 0) {
+            if (!flashTestActive) {
+                flashTestActive = true;
+                int duration = 5000;
+                int durIdx = payload.indexOf("\"duration\":");
+                if (durIdx >= 0) {
+                    duration = payload.substring(durIdx + 11).toInt();
+                    if (duration <= 0 || duration > 30000) duration = 5000;
+                }
+                flashTestEndMs = millis() + duration;
+                Serial.printf("[WEB] Flash Test ACTIVE: %d ms (Pin 4 Orange LED)\n", duration);
+            }
+        } else if (payload.indexOf("\"active\":false") >= 0 || payload.indexOf("\"active\": false") >= 0) {
+            if (flashTestActive) {
+                flashTestActive = false;
+                Serial.println(F("[WEB] Flash Test STOPPED remotely"));
+            }
         }
     }
     http.end();
@@ -393,11 +426,24 @@ void updateWarning() {
 }
 
 void updateLED() {
-    if (!overSpeedActive) {
+    bool isWarning = overSpeedActive;
+
+    // Cek status Flash Test mandiri
+    if (flashTestActive) {
+        if (millis() < flashTestEndMs) {
+            isWarning = true;
+        } else {
+            flashTestActive = false;
+            Serial.println(F("[FLASH TEST] Selesai otomatis."));
+        }
+    }
+
+    if (!isWarning) {
         digitalWrite(GREEN_LED_PIN, HIGH);
         digitalWrite(ORANGE_LED_PIN, LOW);
         return;
     }
+
     digitalWrite(GREEN_LED_PIN, LOW);
     if (millis() - lastBlinkMs >= LED_BLINK_INTERVAL_MS) {
         lastBlinkMs = millis();
@@ -438,7 +484,10 @@ void updateOLED() {
     display.setCursor(0, 0);
     display.print(dateStr);
 
-    if (wifiState == WIFI_CONNECTED) {
+    if (flashTestActive) {
+        display.setCursor(46, 0);
+        display.print("[TEST]");
+    } else if (wifiState == WIFI_CONNECTED) {
         display.setCursor(52, 0);
         display.print("WEB:OK");
     }
@@ -448,15 +497,17 @@ void updateOLED() {
     display.setCursor(SCREEN_WIDTH - w, 0);
     display.print(timeStr);
 
-    // Kecepatan
-    if (!(overSpeedActive && !blinkState)) {
+    // Kecepatan / Flash Test Display
+    if (flashTestActive && !blinkState) {
+        printCentered("FLASH", 16, 3);
+    } else if (!(overSpeedActive && !blinkState)) {
         char speedStr[6];
         if (gpsFix) snprintf(speedStr, sizeof(speedStr), "%d", (int)(currentSpeed + 0.5));
         else snprintf(speedStr, sizeof(speedStr), "--");
         printCentered(speedStr, 16, 4);
     }
 
-    printCentered(gpsFix ? "KM/H" : "NO GPS", 47, 1);
+    printCentered(flashTestActive ? "PIN 4 TEST" : (gpsFix ? "KM/H" : "NO GPS"), 47, 1);
 
     // ODO & TRIP
     char odoStr[20], tripStr[20];
@@ -514,7 +565,7 @@ void loop() {
     updateOLED();
 
     sendTelemetryToWeb();
-    syncSpeedLimitFromWeb();
+    syncCommandsFromWeb();
 
     yield();
 }

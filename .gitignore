@@ -6,3 +6,6 @@ Thumbs.db
 # IDE configuration
 .vscode/
 .idea/
+
+# Firebase Cache
+.firebase/

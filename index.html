@@ -229,6 +229,30 @@
           <span>Speed limit: <strong id="valSpeedLimitDisplay">60 km/h</strong></span>
           <span class="btn-edit-limit-link">Ubah</span>
         </div>
+
+        <!-- Flash Test Diagnostic Card (Lampu Oren / Warning LED Test) -->
+        <div class="flash-test-card" id="flashTestCard">
+          <div class="flash-test-content">
+            <div class="flash-beacon-wrapper" id="flashBeaconWrapper">
+              <span class="flash-beacon-ring"></span>
+              <span class="flash-beacon-core"></span>
+              <svg class="flash-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <div class="flash-test-info">
+              <div class="flash-title-line">
+                <span class="flash-main-title">Flash Test Lampu Oren</span>
+                <span class="flash-status-badge" id="flashStatusBadge">Standby</span>
+              </div>
+              <span class="flash-desc-text" id="flashDescText">Uji kedipan lampu indikator warning (Pin 4)</span>
+            </div>
+          </div>
+          <button type="button" class="btn-trigger-flash" id="btnFlashTest" aria-label="Mulai Flash Test Lampu Oren">
+            <span class="btn-trigger-icon" id="btnFlashIcon">⚡</span>
+            <span class="btn-trigger-label" id="btnFlashLabel">Test Flash</span>
+          </button>
+        </div>
       </section>
 
       <!-- ====================================================================

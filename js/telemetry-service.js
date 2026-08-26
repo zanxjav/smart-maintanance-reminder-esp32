@@ -19,7 +19,8 @@ const listeners = {
   settings: [],
   maintenance: [],
   history: [],
-  connection: []
+  connection: [],
+  flashTest: []
 };
 
 let eventSource = null;
@@ -219,6 +220,38 @@ export function subscribeServiceHistory(callback) {
 export function subscribeConnectionStatus(callback) {
   listeners.connection.push(callback);
   callback({ connected: isConnected, mode: 'FIREBASE_LIVE', status: 'Live Telemetry' });
+}
+
+export function subscribeFlashTest(callback) {
+  listeners.flashTest.push(callback);
+}
+
+/**
+ * Trigger Flash Test Command to Firebase RTDB (Instant & Non-blocking)
+ */
+export async function writeFlashTest(active = true, durationMs = 5000) {
+  const payload = {
+    active: Boolean(active),
+    duration: Number(durationMs),
+    timestamp: Date.now()
+  };
+
+  dispatchLocalUpdate('flashTest', payload);
+
+  // Background non-blocking sync to Firebase Realtime Database
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  fetch(`${FIREBASE_DB_URL}/commands/flashTest.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background flashTest sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
+  return { success: true, ...payload };
 }
 
 /**

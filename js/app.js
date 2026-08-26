@@ -11,8 +11,10 @@ import {
   subscribeMaintenanceStatus, 
   subscribeServiceHistory, 
   subscribeConnectionStatus,
+  subscribeFlashTest,
   writeSpeedLimit, 
-  writeResetTrip 
+  writeResetTrip,
+  writeFlashTest
 } from './telemetry-service.js';
 import { maintenanceEngine } from './maintenance-engine.js';
 
@@ -26,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 1. Instant Synchronous UI Bootstrapping (Zero Lag)
   initClock();
   setupUIEvents();
+  setupFlashTestController();
   setupSpeedLimiterModal();
   setupEditIntervalModal();
   setupConnectionModal();
@@ -549,6 +552,120 @@ function showToast(message, type = 'info') {
     toast.style.transform = 'translateY(10px) scale(0.95)';
     setTimeout(() => toast.remove(), 250);
   }, 2800);
+}
+
+/* ==========================================================================
+   FLASH TEST CONTROLLER (LAMPU OREN / PIN 4 WARNING INDICATOR)
+   ========================================================================== */
+let isFlashTestActive = false;
+let flashTestCountdownTimer = null;
+let flashRemainingSeconds = 0;
+
+function playFlashBeep() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.04, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+  } catch (e) {
+    // Silent fallback
+  }
+}
+
+function setupFlashTestController() {
+  const cardEl = document.getElementById('flashTestCard');
+  const btnEl = document.getElementById('btnFlashTest');
+  const badgeEl = document.getElementById('flashStatusBadge');
+  const descEl = document.getElementById('flashDescText');
+  const iconEl = document.getElementById('btnFlashIcon');
+  const labelEl = document.getElementById('btnFlashLabel');
+
+  if (!btnEl) return;
+
+  const stopFlashTest = (showToastNotice = true) => {
+    if (flashTestCountdownTimer) {
+      clearInterval(flashTestCountdownTimer);
+      flashTestCountdownTimer = null;
+    }
+    isFlashTestActive = false;
+    flashRemainingSeconds = 0;
+
+    if (cardEl) cardEl.classList.remove('is-flashing');
+    if (badgeEl) {
+      badgeEl.textContent = 'Standby';
+      badgeEl.className = 'flash-status-badge';
+    }
+    if (descEl) descEl.textContent = 'Uji kedipan lampu indikator warning (Pin 4)';
+    if (iconEl) iconEl.textContent = '⚡';
+    if (labelEl) labelEl.textContent = 'Test Flash';
+
+    writeFlashTest(false, 0);
+
+    if (showToastNotice) {
+      showToast('Flash Test selesai. Lampu indikator standby.', 'info');
+    }
+  };
+
+  const startFlashTest = (durationSec = 5) => {
+    if (flashTestCountdownTimer) {
+      clearInterval(flashTestCountdownTimer);
+    }
+    isFlashTestActive = true;
+    flashRemainingSeconds = durationSec;
+
+    if (cardEl) cardEl.classList.add('is-flashing');
+    if (badgeEl) {
+      badgeEl.textContent = `⚡ Flashing ${flashRemainingSeconds}s`;
+    }
+    if (descEl) descEl.textContent = 'Lampu oren Pin 4 sedang berkedip (300ms cycle)...';
+    if (iconEl) iconEl.textContent = '✕';
+    if (labelEl) labelEl.textContent = `Stop (${flashRemainingSeconds}s)`;
+
+    playFlashBeep();
+    showToast(`⚡ Flash Test Aktif (${durationSec}s): Menguji kedipan lampu oren...`, 'warning');
+    writeFlashTest(true, durationSec * 1000);
+
+    flashTestCountdownTimer = setInterval(() => {
+      flashRemainingSeconds--;
+      if (flashRemainingSeconds > 0) {
+        if (badgeEl) badgeEl.textContent = `⚡ Flashing ${flashRemainingSeconds}s`;
+        if (labelEl) labelEl.textContent = `Stop (${flashRemainingSeconds}s)`;
+        playFlashBeep();
+      } else {
+        stopFlashTest(true);
+      }
+    }, 1000);
+  };
+
+  btnEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isFlashTestActive) {
+      stopFlashTest(true);
+    } else {
+      startFlashTest(5);
+    }
+  });
+
+  // Remote flash test sync listener
+  subscribeFlashTest((payload) => {
+    if (!payload) return;
+    if (payload.active && !isFlashTestActive) {
+      const dur = Math.max(1, Math.round((payload.duration || 5000) / 1000));
+      startFlashTest(dur);
+    } else if (!payload.active && isFlashTestActive) {
+      stopFlashTest(false);
+    }
+  });
 }
 
 /* ==========================================================================

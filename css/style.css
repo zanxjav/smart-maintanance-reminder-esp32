@@ -538,6 +538,261 @@ body {
 }
 
 /* ==========================================================================
+   FLASH TEST DIAGNOSTIC CARD (LAMPU OREN / WARNING INDICATOR)
+   ========================================================================== */
+.flash-test-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(19, 27, 46, 0.9) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  padding: 0.85rem 1.05rem;
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s var(--ease-spring);
+}
+
+.flash-test-card:hover {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.12);
+}
+
+.flash-test-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Simulated Beacon / Bulb Indicator */
+.flash-beacon-wrapper {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.flash-beacon-ring {
+  position: absolute;
+  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245, 158, 11, 0.4);
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+}
+
+.flash-beacon-core {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f59e0b;
+  opacity: 0.25;
+  filter: blur(2px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.flash-icon-svg {
+  width: 17px;
+  height: 17px;
+  color: #fbbf24;
+  position: relative;
+  z-index: 2;
+  transition: transform 0.2s var(--ease-spring), color 0.15s ease;
+}
+
+.flash-test-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flash-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.flash-main-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.flash-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  transition: all 0.2s ease;
+}
+
+.flash-desc-text {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Flash Test Action Button */
+.btn-trigger-flash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #0b0f19;
+  border: none;
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+  flex-shrink: 0;
+  transition: transform 0.15s var(--ease-spring), box-shadow 0.15s ease, background 0.2s ease, filter 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-trigger-flash:hover {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-trigger-flash:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 6px rgba(245, 158, 11, 0.25);
+}
+
+.btn-trigger-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   ACTIVE FLASHING STATE (HARDWARE ACCELERATED - 60 FPS ZERO LAG)
+   ========================================================================== */
+.flash-test-card.is-flashing {
+  border-color: rgba(245, 158, 11, 0.7);
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.28), inset 0 0 16px rgba(245, 158, 11, 0.08);
+  animation: cardPulseAmber 1.2s infinite alternate ease-in-out;
+}
+
+.flash-test-card.is-flashing .flash-beacon-wrapper {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fbbf24;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.75);
+  animation: beaconStrobe 0.3s infinite ease-in-out;
+}
+
+.flash-test-card.is-flashing .flash-beacon-ring {
+  opacity: 1;
+  animation: beaconWave 1s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flash-test-card.is-flashing .flash-beacon-core {
+  opacity: 1;
+  transform: scale(1.5);
+  filter: blur(1px);
+}
+
+.flash-test-card.is-flashing .flash-icon-svg {
+  color: #ffffff;
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 6px #f59e0b);
+}
+
+.flash-test-card.is-flashing .flash-status-badge {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.5);
+  animation: badgeBlink 0.6s infinite alternate;
+}
+
+.flash-test-card.is-flashing .btn-trigger-flash {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 14px rgba(239, 68, 68, 0.5);
+  animation: btnPulseCancel 1s infinite alternate ease-in-out;
+}
+
+.flash-test-card.is-flashing .btn-trigger-flash:hover {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+}
+
+/* GPU Optimized Animations */
+@keyframes beaconStrobe {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 12px #f59e0b);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.95);
+    filter: drop-shadow(0 0 2px #f59e0b);
+  }
+}
+
+@keyframes beaconWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes cardPulseAmber {
+  0% {
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  100% {
+    border-color: rgba(245, 158, 11, 0.85);
+  }
+}
+
+@keyframes badgeBlink {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+@keyframes btnPulseCancel {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  }
+  100% {
+    transform: scale(1.02);
+    box-shadow: 0 4px 18px rgba(239, 68, 68, 0.65);
+  }
+}
+
+/* ==========================================================================
    MAINTENANCE REMINDERS LIST (MODERN SPACIOUS CARDS)
    ========================================================================== */
 .section-view-all {
