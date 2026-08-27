@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vehicle-monitor-v2026-sport-analog-v2';
+const CACHE_NAME = 'vehicle-monitor-2d-flat-v1';
 
 // Install: Pre-cache static shell & skip waiting immediately
 self.addEventListener('install', (event) => {

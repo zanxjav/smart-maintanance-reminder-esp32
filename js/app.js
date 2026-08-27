@@ -151,7 +151,7 @@ function handleVehicleDataUpdate(data) {
 }
 
 /**
- * Dynamic Redline Arc based on configured Speed Limit (Scale 0 to 140 km/h)
+ * Dynamic 2D Redline Arc based on configured Speed Limit (Scale 0 to 140 km/h in 180° semi-circle)
  */
 export function updateRedlineArc(speedLimitVal) {
   const maxScale = 140;
@@ -160,37 +160,32 @@ export function updateRedlineArc(speedLimitVal) {
   const badgeEl = document.getElementById('analogSpeedLimitBadge');
 
   if (badgeEl) {
-    badgeEl.textContent = `LIMIT ${limit}`;
+    badgeEl.textContent = `LIMIT ${limit} KM/H`;
   }
 
   if (redlineArc) {
-    // Formula: dial angle for limit in a 240 deg dial (from -210 deg to +30 deg)
-    const startAngleDeg = -210 + (limit / maxScale) * 240;
+    // 180° semi-circle arc from left (180°) to right (0°)
+    const startAngleDeg = 180 - (limit / maxScale) * 180;
     const startAngleRad = startAngleDeg * (Math.PI / 180);
-    const endAngleDeg = 30; // 140 km/h end position
-    const endAngleRad = endAngleDeg * (Math.PI / 180);
 
-    const cx = 140, cy = 135, r = 98;
+    const cx = 140, cy = 120, r = 95;
     const x1 = cx + r * Math.cos(startAngleRad);
-    const y1 = cy + r * Math.sin(startAngleRad);
-    const x2 = cx + r * Math.cos(endAngleRad);
-    const y2 = cy + r * Math.sin(endAngleRad);
+    const y1 = cy - r * Math.sin(startAngleRad);
+    const x2 = cx + r; // 235
+    const y2 = cy;     // 120
 
-    const deltaAngle = endAngleDeg - startAngleDeg;
-    const largeArc = deltaAngle > 180 ? 1 : 0;
-
-    redlineArc.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`);
+    redlineArc.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 0 1 ${x2} ${y2}`);
   }
 }
 
 /**
- * Update Analog Needle rotation & warning styling
+ * Update Flat 2D Needle rotation (-90° to +90°) & warning styling
  */
 export function updateAnalogNeedle(speed, limit) {
   const maxScale = 140;
   const clampedSpeed = Math.min(maxScale, Math.max(0, speed));
-  // Needle rotation: -120 deg (0 km/h) to +120 deg (140 km/h)
-  const rotationDeg = -120 + (clampedSpeed / maxScale) * 240;
+  // Needle rotation in 180° semi-circle: -90 deg (0 km/h) to +90 deg (140 km/h)
+  const rotationDeg = -90 + (clampedSpeed / maxScale) * 180;
 
   const needleGroup = document.getElementById('analogNeedleGroup');
   const needleBody = document.getElementById('speedNeedleBody');
@@ -207,26 +202,26 @@ export function updateAnalogNeedle(speed, limit) {
   if (isOverSpeed) {
     if (needleBody) {
       needleBody.setAttribute('fill', '#ef4444');
-      needleBody.style.filter = 'drop-shadow(0 0 10px #ef4444)';
+      needleBody.style.filter = 'drop-shadow(0 0 8px #ef4444)';
     }
-    if (needleCenterDot) needleCenterDot.setAttribute('fill', '#ef4444');
+    if (needleCenterDot) needleCenterDot.setAttribute('stroke', '#ef4444');
     if (speedValEl) speedValEl.style.color = '#ef4444';
     if (speedLargeEl) speedLargeEl.style.color = '#ef4444';
     if (redlineArc) {
       redlineArc.style.stroke = '#ef4444';
-      redlineArc.style.filter = 'drop-shadow(0 0 14px #ef4444)';
+      redlineArc.style.filter = 'drop-shadow(0 0 10px #ef4444)';
     }
   } else {
     if (needleBody) {
       needleBody.setAttribute('fill', '#38bdf8');
-      needleBody.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.8))';
+      needleBody.style.filter = 'drop-shadow(0 0 6px rgba(56, 189, 248, 0.75))';
     }
-    if (needleCenterDot) needleCenterDot.setAttribute('fill', '#38bdf8');
+    if (needleCenterDot) needleCenterDot.setAttribute('stroke', '#38bdf8');
     if (speedValEl) speedValEl.style.color = '#ffffff';
     if (speedLargeEl) speedLargeEl.style.color = '#ffffff';
     if (redlineArc) {
       redlineArc.style.stroke = '#ef4444';
-      redlineArc.style.filter = 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.75))';
+      redlineArc.style.filter = 'drop-shadow(0 0 6px rgba(239, 68, 68, 0.8))';
     }
   }
 }

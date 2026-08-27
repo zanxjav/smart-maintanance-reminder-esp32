@@ -422,90 +422,84 @@ body {
 }
 
 /* ==========================================================================
-   SPORT AUTOMOTIVE ANALOG SPEEDOMETER CLUSTER (RESPONSIVE MOBILE)
+   CLEAN FLAT 2D AUTOMOTIVE SEMI-CIRCULAR SPEEDOMETER
    ========================================================================== */
-.analog-speedometer-display {
+.gauge-2d-display {
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
   width: 100%;
-  padding: 0.2rem 0;
+  padding: 0.4rem 0 0.1rem;
 }
 
-.analog-svg-wrap {
+.gauge-2d-wrap {
   position: relative;
   width: 100%;
-  max-width: 310px;
+  max-width: 320px;
   height: auto;
-  aspect-ratio: 280 / 210;
+  aspect-ratio: 280 / 148;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
 }
 
-.analog-speed-svg {
+.gauge-2d-svg {
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.45));
 }
 
-.analog-track-bg {
+.gauge-2d-track-bg {
   fill: none;
   stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: 3.5;
+  stroke-width: 4;
+  stroke-linecap: round;
 }
 
-.speed-redline-arc {
+.gauge-2d-redline {
   fill: none;
   stroke: #ef4444;
   stroke-width: 5.5;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.85));
-  transition: all 0.3s ease;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+  transition: all 0.25s ease;
 }
 
-.analog-tick-major {
-  stroke: #ffffff;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
-}
-
-.analog-tick-minor {
-  stroke: rgba(203, 213, 225, 0.45);
-  stroke-width: 1.5;
+.gauge-2d-tick-major {
+  stroke: #e2e8f0;
+  stroke-width: 2.2;
   stroke-linecap: round;
 }
 
-.analog-tick-num {
-  fill: #ffffff;
+.gauge-2d-tick-minor {
+  stroke: rgba(226, 232, 240, 0.35);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.gauge-2d-tick-num {
+  fill: #94a3b8;
   font-size: 11.5px;
-  font-weight: 800;
+  font-weight: 700;
   font-family: var(--font-sans);
   text-anchor: middle;
   dominant-baseline: central;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
 }
 
 #analogNeedleGroup {
   transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-  transform-origin: 140px 135px;
+  transform-origin: 140px 120px;
 }
 
 #speedNeedleBody {
-  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.9));
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.75));
   transition: fill 0.3s ease, filter 0.3s ease;
 }
 
-#needleCenterDot {
-  transition: fill 0.3s ease;
-}
-
-.analog-center-display {
+.gauge-2d-center-text {
   position: absolute;
-  bottom: 12px;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -513,18 +507,18 @@ body {
   pointer-events: none;
 }
 
-.analog-speed-num {
-  font-size: 2.6rem;
+.gauge-2d-speed-num {
+  font-size: 2.9rem;
   font-weight: 900;
   color: #ffffff;
   line-height: 1;
   letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
   transition: color 0.3s ease;
 }
 
-.analog-speed-unit {
+.gauge-2d-speed-unit {
   font-size: 0.72rem;
   font-weight: 800;
   color: var(--text-muted);
@@ -532,15 +526,15 @@ body {
   margin-top: 1px;
 }
 
-.analog-speed-limit-tag {
+.gauge-2d-limit-tag {
   font-size: 0.65rem;
   font-weight: 700;
   color: #38bdf8;
-  background: rgba(56, 189, 248, 0.14);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   padding: 1px 8px;
   border-radius: 999px;
-  margin-top: 3px;
+  margin-top: 2px;
   letter-spacing: 0.5px;
   transition: all 0.3s ease;
 }
