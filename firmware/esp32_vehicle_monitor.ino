@@ -1,4 +1,4 @@
-#include "ST7789_ESP32.h"
+#include "ST7789_ESP32_7PIN_Lite.h"
 #include <SPI.h>
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
@@ -26,7 +26,7 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 #define GPS_BAUD       9600
 
 // TFT ST7789 240x240 IPS (Modul 7-Pin, Tanpa Pin CS)
-// *** MENGGUNAKAN CUSTOM DRIVER ST7789_ESP32 - ZERO DEPENDENCIES ***
+// *** MENGGUNAKAN CUSTOM DRIVER ST7789_ESP32_7PIN_Lite - ZERO DEPENDENCIES ***
 //
 // WIRING MODUL TFT 7-PIN ke ESP32-C3:
 // ┌────────────────────────────────────────────────┐
@@ -90,7 +90,7 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(1);
 // Custom ST7789 Constructor: (SCLK, MOSI, DC, RST, CS=-1, BLK=5)
-ST7789_ESP32 display(TFT_SCLK_PIN, TFT_MOSI_PIN, TFT_DC_PIN, TFT_RST_PIN, -1, TFT_BLK_PIN);
+ST7789_ESP32_7PIN_Lite display(TFT_SCLK_PIN, TFT_MOSI_PIN, TFT_DC_PIN, TFT_RST_PIN, -1, TFT_BLK_PIN);
 Preferences preferences;
 WiFiClientSecure firebaseClient;
 
@@ -732,8 +732,8 @@ void setup() {
     // TFT ST7789 INIT (CUSTOM STANDALONE DRIVER)
     // ============================================
     Serial.println(F("[TFT] Step 1: Inisialisasi Custom ST7789 Driver..."));
-    // begin(w, h, useHwSPI=true, freq=40MHz)
-    display.begin(SCREEN_WIDTH, SCREEN_HEIGHT, true, 40000000);
+    display.begin(SCREEN_WIDTH, SCREEN_HEIGHT, true, 20000000UL);
+    display.setTextWrap(false);
     display.setRotation(0);          // 0=portrait standard
     display.invertDisplay(true);     // ST7789 IPS butuh Invert ON agar warna akurat
 
