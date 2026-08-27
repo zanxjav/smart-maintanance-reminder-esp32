@@ -1,6 +1,6 @@
-#include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_ST7789.h>
+#include <SPI.h>
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
 #include <Preferences.h>
@@ -19,47 +19,74 @@ const char* password = "cicing77";
 const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 // ============================================================
-// 2. PIN CONFIGURATION (ESP32-C3)
+// 2. PIN CONFIGURATION (ESP32-C3) - AMAN BEBAS STRAPPING PIN
 // ============================================================
-#define GPS_RX_PIN   20   // ESP32-C3 RX <-- NEO-6M TX
-#define GPS_TX_PIN   21   // ESP32-C3 TX --> NEO-6M RX
-#define GPS_BAUD     9600
+// GPS NEO-6M UART
+#define GPS_RX_PIN     20   // ESP32-C3 RX <-- NEO-6M TX
+#define GPS_TX_PIN     21   // ESP32-C3 TX --> NEO-6M RX
+#define GPS_BAUD       9600
 
-#define OLED_SDA_PIN 5
-#define OLED_SCL_PIN 6
-#define SCREEN_WIDTH  128
-#define SCREEN_HEIGHT 64
-#define OLED_ADDR    0x3C
+// TFT SPI (ST7789 240x240 IPS Display 7-Pin / 8-Pin)
+// Hubungkan:
+// SCL (SCLK) -> GPIO 4
+// SDA (MOSI) -> GPIO 6
+// RES (RST)  -> GPIO 1
+// DC  (RS)   -> GPIO 2
+// BLK (LED)  -> 3.3V (atau GPIO 5)
+// CS         -> GND (jika ada pin CS)
+#define TFT_SCLK_PIN   4    // SPI Clock (SCL di modul TFT)
+#define TFT_MOSI_PIN   6    // SPI Data (SDA di modul TFT)
+#define TFT_RST_PIN    1    // Reset (RES di modul TFT)
+#define TFT_DC_PIN     2    // Data/Command (DC di modul TFT)
+#define TFT_CS_PIN    -1    // -1 jika CS sudah di-ground internal modul
+#define TFT_BLK_PIN    5    // Backlight control (atau jumper ke 3.3V)
 
-#define GREEN_LED_PIN  3
-#define ORANGE_LED_PIN 4
+#define SCREEN_WIDTH   240
+#define SCREEN_HEIGHT  240
+
+// LED Indikator Fisik
+#define GREEN_LED_PIN  0    // LED Hijau (Status Normal / Standby)
+#define ORANGE_LED_PIN 3    // LED Oren (Warning Speed / Flash Test Pin 4)
 
 // ============================================================
-// 3. PARAMETER & TIMING NON-BLOCKING
+// 3. PALET WARNA TFT 16-BIT (RGB565 AUTOMOTIVE THEME)
+// ============================================================
+#define COLOR_BG        0x0842  // Dark Navy / Black (#080C14)
+#define COLOR_CARD_BG   0x10E4  // Card Dark Slate (#101B2B)
+#define COLOR_BORDER    0x2988  // Border Gray/Blue
+#define COLOR_CYAN      0x367F  // Electric Cyan (#38BDF8)
+#define COLOR_GREEN     0x25F0  // Bright Emerald (#10B981)
+#define COLOR_AMBER     0xFD00  // Warning Amber (#F59E0B)
+#define COLOR_RED       0xF9A6  // Alert Crimson (#EF4444)
+#define COLOR_WHITE     0xFFFF  // Pure White
+#define COLOR_TEXT_MUTED 0x9514 // Muted Slate Text (#94A3B8)
+
+// ============================================================
+// 4. PARAMETER & TIMING NON-BLOCKING
 // ============================================================
 #define DEFAULT_SPEED_LIMIT      60.0
 #define INITIAL_ODO_KM           97248.0
 #define UTC_OFFSET_HOURS         7
 
-#define OLED_UPDATE_INTERVAL_MS  100     // Refresh rate OLED 10 FPS
+#define TFT_UPDATE_INTERVAL_MS   100     // 10 FPS super smooth
 #define LED_BLINK_INTERVAL_MS    175
-#define WEB_SEND_INTERVAL_MS     1000    // Kirim data ke Web tiap 1 detik
-#define WEB_SYNC_INTERVAL_MS     3000    // Cek limit & perintah web tiap 3 detik
+#define WEB_SEND_INTERVAL_MS     1000    // Kirim telemetri tiap 1s
+#define WEB_SYNC_INTERVAL_MS     3000    // Sinkronisasi limit tiap 3s
 
 #define ODO_SAVE_DISTANCE_KM     0.5
 #define ODO_SAVE_INTERVAL_MS     60000UL
 
 // ============================================================
-// 4. OBJEK GLOBAL & CLIENT KONEKSI CEPAT (PERSISTENT TLS)
+// 5. OBJEK GLOBAL & CLIENT
 // ============================================================
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(1);
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+Adafruit_ST7789 display = Adafruit_ST7789(&SPI, TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN);
 Preferences preferences;
 WiFiClientSecure firebaseClient;
 
 // ============================================================
-// 5. STATE GLOBAL
+// 6. STATE GLOBAL
 // ============================================================
 double speedLimit      = DEFAULT_SPEED_LIMIT;
 double odoKm           = INITIAL_ODO_KM;
@@ -68,7 +95,7 @@ double currentSpeed    = 0.0;
 bool   gpsFix          = false;
 bool   overSpeedActive = false;
 
-// State tambahan khusus kendali Flash Test LED Oren (Pin 4)
+// State tambahan khusus kendali Flash Test LED Oren
 bool   flashTestActive = false;
 unsigned long flashTestEndMs = 0;
 
@@ -76,13 +103,12 @@ double lastLat = 0.0;
 double lastLng = 0.0;
 bool   hasLastPosition = false;
 
-// Filter anti-jitter kecepatan saat diam
 int    consecutiveSpeedHits = 0;
 
 double odoAtLastSave = INITIAL_ODO_KM;
 unsigned long lastOdoSaveMs = 0;
 
-unsigned long lastOledUpdateMs  = 0;
+unsigned long lastTftUpdateMs   = 0;
 unsigned long lastBlinkMs       = 0;
 unsigned long lastWebSendMs     = 0;
 unsigned long lastWebSyncMs     = 0;
@@ -95,13 +121,25 @@ int  wibHour = 0, wibMinute = 0, wibSecond = 0;
 bool dateTimeValid = false;
 bool timeSyncStarted = false;
 
+// State cache untuk render TFT anti-flicker (hanya redraw yang berubah)
+int  lastDispSpeed = -999;
+int  lastDispSat   = -999;
+bool lastDispFix   = false;
+bool lastDispWarn  = false;
+bool lastDispFlash = false;
+int  lastDispHour  = -1;
+int  lastDispMin   = -1;
+int  lastDispDay   = -1;
+long lastDispOdo   = -1;
+int  lastDispTrip10 = -1;
+
 const char* MONTH_NAMES[] = {
   "JAN","FEB","MAR","APR","MEI","JUN",
   "JUL","AGU","SEP","OKT","NOV","DES"
 };
 
 // ============================================================
-// 6. NTP TIME SYNC (INSTAN REAL-TIME DARI INTERNET / WIB)
+// 7. NTP TIME SYNC (WIB GMT+7)
 // ============================================================
 void startTimeSync() {
     if (timeSyncStarted) return;
@@ -111,7 +149,7 @@ void startTimeSync() {
 }
 
 int daysInMonth(int month, int year) {
-    static const int table[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    static const int table[] = {31,28,31,30,31,30,31,31,30,31,31,30,31};
     if (month == 2) {
         bool leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
         return leap ? 29 : 28;
@@ -121,7 +159,7 @@ int daysInMonth(int month, int year) {
 
 void updateDateTime() {
     time_t now = time(nullptr);
-    if (now > 1700000000) { // Waktu epoch valid
+    if (now > 1700000000) {
         struct tm timeinfo;
         localtime_r(&now, &timeinfo);
         wibYear   = timeinfo.tm_year + 1900;
@@ -165,7 +203,7 @@ void updateDateTime() {
 }
 
 // ============================================================
-// 7. WIFI STATE MANAGEMENT (NON-BLOCKING)
+// 8. WIFI STATE MANAGEMENT (NON-BLOCKING)
 // ============================================================
 enum WifiState { WIFI_IDLE, WIFI_CONNECTING, WIFI_CONNECTED };
 WifiState wifiState = WIFI_IDLE;
@@ -229,7 +267,7 @@ void updateWifi() {
 }
 
 // ============================================================
-// 8. KOMUNIKASI RINGAN KE FIREBASE WEB (REUSED TLS - ZERO STALL)
+// 9. TELEMETRI KE FIREBASE REALTIME DATABASE
 // ============================================================
 void sendTelemetryToWeb() {
     if (wifiState != WIFI_CONNECTED) return;
@@ -309,7 +347,7 @@ void syncSpeedLimitFromWeb() {
     }
     http.end();
 
-    // 2. Sync Kendali Flash Test LED Oren (Pin 4)
+    // 2. Sync Kendali Flash Test LED Oren
     String flashUrl = String(FIREBASE_HOST) + "/commands/flashTest.json";
     http.begin(firebaseClient, flashUrl);
     http.setReuse(true);
@@ -328,7 +366,7 @@ void syncSpeedLimitFromWeb() {
                     if (duration <= 0 || duration > 30000) duration = 5000;
                 }
                 flashTestEndMs = millis() + duration;
-                Serial.printf("[WEB] Flash Test STARTED: %d ms (Pin 4 Orange LED)\n", duration);
+                Serial.printf("[WEB] Flash Test STARTED: %d ms (Pin %d LED)\n", duration, ORANGE_LED_PIN);
             }
         } else if (payload.indexOf("\"active\":false") >= 0 || payload.indexOf("\"active\": false") >= 0) {
             if (flashTestActive) {
@@ -341,7 +379,7 @@ void syncSpeedLimitFromWeb() {
 }
 
 // ============================================================
-// 9. GPS, KECEPATAN & TRIP/ODO DENGAN FILTER PRESISI TINGGI
+// 10. GPS, KECEPATAN & ODOMETER
 // ============================================================
 void readGPS() {
     while (gpsSerial.available() > 0) {
@@ -350,20 +388,15 @@ void readGPS() {
 }
 
 void updateSpeed() {
-    // 1. Validasi kecepatan GPS dari TinyGPS++ dengan syarat satelit memadai (>= 4)
     if (gps.speed.isValid() && gps.speed.age() < 2000 && gps.satellites.value() >= 4) {
         double rawKmph = gps.speed.kmph();
 
-        // Filter noise saat mobil diam / berhenti di lampu merah (< 2.8 km/h dipaksa murni 0.0)
         if (rawKmph < 2.8) {
             consecutiveSpeedHits = 0;
             currentSpeed = 0.0;
         } else {
             consecutiveSpeedHits++;
-            // Memerlukan minimal 2 frame valid berturut-turut untuk berpindah dari diam ke bergerak
-            // Ini mencegah glitch 1-frame GPS saat mobil sedang berhenti
             if (consecutiveSpeedHits >= 2 || currentSpeed > 0.0) {
-                // Hysteresis: jika sudah melaju, toleransi hingga < 2.0 km/h sebelum kembali ke 0
                 if (rawKmph >= 2.0) {
                     currentSpeed = rawKmph;
                 } else {
@@ -375,7 +408,6 @@ void updateSpeed() {
         lastValidSpeedMs = millis();
         gpsFix = true;
     } else if (millis() - lastValidSpeedMs < 1500 && currentSpeed >= 3.5) {
-        // Grace period singkat hanya jika kendaraan memang sedang melaju
         gpsFix = (gps.satellites.value() >= 4);
     } else {
         currentSpeed = 0.0;
@@ -393,7 +425,6 @@ void updateTripAndOdo() {
     double dtSec = (now - lastDistCalcMs) / 1000.0;
     lastDistCalcMs = now;
 
-    // Jika kendaraan diam (kecepatan 0 atau di bawah deadband), jangan hitung jarak sama sekali
     if (currentSpeed < 2.8 || !gpsFix) {
         if (gps.location.isValid()) {
             lastLat = gps.location.lat();
@@ -415,7 +446,6 @@ void updateTripAndOdo() {
         }
 
         double distanceM = TinyGPSPlus::distanceBetween(lastLat, lastLng, curLat, curLng);
-        // Validasi jarak per update antara 0.8 meter dan 120 meter (buang glitch teleport GPS)
         if (distanceM >= 0.8 && distanceM <= 120.0) {
             double distanceKm = distanceM / 1000.0;
             tripKm += distanceKm;
@@ -427,7 +457,6 @@ void updateTripAndOdo() {
         }
     }
 
-    // Dead-reckoning halus saat mobil bergerak tapi frame koordinat belum berubah
     if (dtSec > 0.05 && dtSec < 1.5 && currentSpeed >= 3.0) {
         double deltaKm = (currentSpeed / 3600.0) * dtSec;
         tripKm += deltaKm;
@@ -465,7 +494,6 @@ void updateWarning() {
 void updateLED() {
     bool isWarning = overSpeedActive;
 
-    // Kendali non-blocking untuk Flash Test LED Oren
     if (flashTestActive) {
         if (millis() < flashTestEndMs) {
             isWarning = true;
@@ -489,79 +517,199 @@ void updateLED() {
 }
 
 // ============================================================
-// 10. OLED DISPLAY (DENGAN JAM & TANGGAL REALTIME)
+// 11. TFT ST7789 240x240 DASHBOARD (ZERO-FLICKER SCADA DESIGN)
 // ============================================================
-void printCentered(const char* text, int y, int textSize) {
-    display.setTextSize(textSize);
-    int16_t x1, y1; uint16_t w, h;
-    display.getTextBounds(text, 0, 0, &x1, &y1, &w, &h);
-    int x = (SCREEN_WIDTH - (int)w) / 2;
-    if (x < 0) x = 0;
-    display.setCursor(x, y);
-    display.print(text);
-}
+void drawDashboardLayout() {
+    display.fillScreen(COLOR_BG);
 
-void updateOLED() {
-    if (millis() - lastOledUpdateMs < OLED_UPDATE_INTERVAL_MS) return;
-    lastOledUpdateMs = millis();
+    // 1. Header Bar (y: 0 - 32)
+    display.fillRoundRect(6, 6, 228, 28, 6, COLOR_CARD_BG);
+    display.drawRoundRect(6, 6, 228, 28, 6, COLOR_BORDER);
 
-    display.clearDisplay();
+    // 2. Speedometer Center Gauge Card (y: 38 - 165)
+    display.fillRoundRect(6, 38, 228, 126, 10, COLOR_CARD_BG);
+    display.drawRoundRect(6, 38, 228, 126, 10, COLOR_BORDER);
 
-    // Baris Header: Tanggal, Indikator WiFi & Jam Menit Detik
+    // Static label "KM/H"
+    display.setTextSize(2);
+    display.setTextColor(COLOR_TEXT_MUTED);
+    display.setCursor(95, 125);
+    display.print("KM/H");
+
+    // 3. Bottom Cards (y: 168 - 234)
+    // ODO Card (Left)
+    display.fillRoundRect(6, 168, 111, 66, 8, COLOR_CARD_BG);
+    display.drawRoundRect(6, 168, 111, 66, 8, COLOR_BORDER);
     display.setTextSize(1);
-    char dateStr[14], timeStr[10];
-    if (dateTimeValid) {
-        snprintf(dateStr, sizeof(dateStr), "%d %s", wibDay, MONTH_NAMES[wibMonth - 1]);
-        snprintf(timeStr, sizeof(timeStr), "%02d:%02d", wibHour, wibMinute);
-    } else {
-        snprintf(dateStr, sizeof(dateStr), "-- ---");
-        snprintf(timeStr, sizeof(timeStr), "--:--");
-    }
-    display.setCursor(0, 0);
-    display.print(dateStr);
+    display.setTextColor(COLOR_TEXT_MUTED);
+    display.setCursor(14, 175);
+    display.print("TOTAL ODO");
 
-    if (flashTestActive) {
-        display.setCursor(46, 0);
-        display.print("[TEST]");
-    } else if (wifiState == WIFI_CONNECTED) {
-        display.setCursor(52, 0);
-        display.print("WEB:OK");
-    }
+    // TRIP Card (Right)
+    display.fillRoundRect(123, 168, 111, 66, 8, COLOR_CARD_BG);
+    display.drawRoundRect(123, 168, 111, 66, 8, COLOR_BORDER);
+    display.setTextSize(1);
+    display.setTextColor(COLOR_TEXT_MUTED);
+    display.setCursor(131, 175);
+    display.print("TRIP METER");
+}
 
+void printCenteredNumber(int number, int y, int size, uint16_t color, uint16_t bg) {
+    char buf[10];
+    snprintf(buf, sizeof(buf), "%d", number);
+    
+    // Clear dynamic speed area cleanly without full redraw
+    display.fillRect(15, y - 4, 210, 68, bg);
+    
+    display.setTextSize(size);
+    display.setTextColor(color, bg);
     int16_t x1, y1; uint16_t w, h;
-    display.getTextBounds(timeStr, 0, 0, &x1, &y1, &w, &h);
-    display.setCursor(SCREEN_WIDTH - w, 0);
-    display.print(timeStr);
+    display.getTextBounds(buf, 0, 0, &x1, &y1, &w, &h);
+    int x = (SCREEN_WIDTH - (int)w) / 2;
+    if (x < 15) x = 15;
+    display.setCursor(x, y);
+    display.print(buf);
+}
 
-    // Kecepatan
-    if (!(overSpeedActive && !blinkState)) {
-        char speedStr[6];
-        if (gpsFix) {
-            int displaySpeed = (currentSpeed >= 2.8) ? (int)(currentSpeed + 0.5) : 0;
-            snprintf(speedStr, sizeof(speedStr), "%d", displaySpeed);
+void updateTFT() {
+    unsigned long now = millis();
+    if (now - lastTftUpdateMs < TFT_UPDATE_INTERVAL_MS) return;
+    lastTftUpdateMs = now;
+
+    // --- 1. UPDATE HEADER: TANGGAL, STATUS CLOUD, JAM ---
+    if (wibDay != lastDispDay || wibHour != lastDispHour || wibMinute != lastDispMin) {
+        lastDispDay  = wibDay;
+        lastDispHour = wibHour;
+        lastDispMin  = wibMinute;
+
+        // Tanggal
+        display.fillRect(12, 12, 60, 16, COLOR_CARD_BG);
+        display.setTextSize(1);
+        display.setTextColor(COLOR_CYAN, COLOR_CARD_BG);
+        display.setCursor(12, 15);
+        if (dateTimeValid) {
+            char dStr[10];
+            snprintf(dStr, sizeof(dStr), "%02d %s", wibDay, MONTH_NAMES[wibMonth - 1]);
+            display.print(dStr);
         } else {
-            snprintf(speedStr, sizeof(speedStr), "--");
+            display.print("-- ---");
         }
-        printCentered(speedStr, 16, 4);
+
+        // Jam Menit
+        display.fillRect(174, 12, 54, 16, COLOR_CARD_BG);
+        display.setTextSize(1);
+        display.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+        display.setCursor(176, 15);
+        if (dateTimeValid) {
+            char tStr[8];
+            snprintf(tStr, sizeof(tStr), "%02d:%02d", wibHour, wibMinute);
+            display.print(tStr);
+        } else {
+            display.print("--:--");
+        }
     }
 
-    printCentered(flashTestActive ? "PIN 4 TEST" : (gpsFix ? "KM/H" : "NO GPS"), 47, 1);
+    // Status WiFi / Flash Test Badge di tengah Header
+    if (flashTestActive != lastDispFlash || (wifiState == WIFI_CONNECTED) != lastDispFix) {
+        lastDispFlash = flashTestActive;
+        lastDispFix = (wifiState == WIFI_CONNECTED);
 
-    // ODO & TRIP
-    char odoStr[20], tripStr[20];
-    snprintf(odoStr, sizeof(odoStr), "ODO %ld", (long)odoKm);
-    snprintf(tripStr, sizeof(tripStr), "TRIP %.1f", tripKm);
-    display.setCursor(0, 56);
-    display.print(odoStr);
-    display.getTextBounds(tripStr, 0, 0, &x1, &y1, &w, &h);
-    display.setCursor(SCREEN_WIDTH - w, 56);
-    display.print(tripStr);
+        display.fillRect(80, 10, 80, 20, COLOR_CARD_BG);
+        display.setTextSize(1);
+        if (flashTestActive) {
+            display.fillRoundRect(82, 11, 76, 18, 4, COLOR_AMBER);
+            display.setTextColor(COLOR_BG, COLOR_AMBER);
+            display.setCursor(88, 16);
+            display.print("FLASH TEST");
+        } else if (wifiState == WIFI_CONNECTED) {
+            display.fillRoundRect(88, 11, 64, 18, 4, COLOR_GREEN);
+            display.setTextColor(COLOR_BG, COLOR_GREEN);
+            display.setCursor(96, 16);
+            display.print("LIVE IOT");
+        } else {
+            display.setTextColor(COLOR_TEXT_MUTED, COLOR_CARD_BG);
+            display.setCursor(90, 16);
+            display.print("OFFLINE");
+        }
+    }
 
-    display.display();
+    // --- 2. UPDATE SPEED DISPLAY (CENTER GAUGE) ---
+    int displaySpeed = 0;
+    if (gpsFix && currentSpeed >= 2.8) {
+        displaySpeed = (int)(currentSpeed + 0.5);
+    }
+
+    bool isWarning = overSpeedActive || flashTestActive;
+
+    if (displaySpeed != lastDispSpeed || isWarning != lastDispWarn) {
+        lastDispSpeed = displaySpeed;
+        lastDispWarn  = isWarning;
+
+        uint16_t speedColor = COLOR_CYAN;
+        if (isWarning) {
+            speedColor = COLOR_RED;
+        } else if (displaySpeed >= (int)(speedLimit * 0.85)) {
+            speedColor = COLOR_AMBER;
+        }
+
+        if (gpsFix) {
+            printCenteredNumber(displaySpeed, 54, 7, speedColor, COLOR_CARD_BG);
+        } else {
+            display.fillRect(15, 50, 210, 68, COLOR_CARD_BG);
+            display.setTextSize(4);
+            display.setTextColor(COLOR_AMBER, COLOR_CARD_BG);
+            display.setCursor(55, 66);
+            display.print("NO GPS");
+        }
+
+        // Status Limit / Warning Banner di bawah Speed
+        display.fillRect(12, 146, 216, 15, COLOR_CARD_BG);
+        display.setTextSize(1);
+        if (isWarning) {
+            display.setTextColor(COLOR_RED, COLOR_CARD_BG);
+            display.setCursor(52, 148);
+            display.print(flashTestActive ? "! FLASH TEST ACTIVE !" : "! OVER SPEED LIMIT !");
+        } else {
+            display.setTextColor(COLOR_TEXT_MUTED, COLOR_CARD_BG);
+            display.setCursor(58, 148);
+            char limStr[28];
+            snprintf(limStr, sizeof(limStr), "SPEED LIMIT: %d KM/H", (int)speedLimit);
+            display.print(limStr);
+        }
+    }
+
+    // --- 3. UPDATE ODO & TRIP (BOTTOM CARDS) ---
+    long curOdoInt = (long)(odoKm + 0.5);
+    if (curOdoInt != lastDispOdo) {
+        lastDispOdo = curOdoInt;
+        display.fillRect(12, 192, 98, 36, COLOR_CARD_BG);
+        display.setTextSize(2);
+        display.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+        display.setCursor(14, 194);
+        display.print(curOdoInt);
+        display.setTextSize(1);
+        display.setTextColor(COLOR_CYAN, COLOR_CARD_BG);
+        display.setCursor(14, 216);
+        display.print("KM TOTAL");
+    }
+
+    int curTrip10 = (int)(tripKm * 10.0 + 0.5);
+    if (curTrip10 != lastDispTrip10) {
+        lastDispTrip10 = curTrip10;
+        display.fillRect(129, 192, 98, 36, COLOR_CARD_BG);
+        display.setTextSize(2);
+        display.setTextColor(COLOR_WHITE, COLOR_CARD_BG);
+        display.setCursor(131, 194);
+        display.print(tripKm, 1);
+        display.setTextSize(1);
+        display.setTextColor(COLOR_GREEN, COLOR_CARD_BG);
+        display.setCursor(131, 216);
+        display.print("KM TRIP");
+    }
 }
 
 // ============================================================
-// 11. SETUP & MAIN LOOP
+// 12. SETUP & MAIN LOOP
 // ============================================================
 void setup() {
     Serial.begin(115200);
@@ -571,22 +719,37 @@ void setup() {
     digitalWrite(GREEN_LED_PIN, LOW);
     digitalWrite(ORANGE_LED_PIN, LOW);
 
-    // Perbesar buffer UART GPS menjadi 1KB agar tidak ada kalimat NMEA yang drop
+    // 1. Inisialisasi Backlight TFT (Pin BLK)
+    pinMode(TFT_BLK_PIN, OUTPUT);
+    digitalWrite(TFT_BLK_PIN, HIGH);
+
+    // 2. Inisialisasi Bus Hardware SPI ESP32-C3 (SCLK, MISO, MOSI, SS)
+    SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, -1);
+
+    // 3. Inisialisasi ST7789 TFT 240x240
+    // SPI_MODE2 adalah mode standar paling kompatibel untuk modul ST7789 7-pin tanpa CS
+    display.init(SCREEN_WIDTH, SCREEN_HEIGHT, SPI_MODE2);
+    display.setRotation(0);          // Rotasi 0-3 (0: Normal vertikal)
+    display.invertDisplay(true);     // ST7789 IPS butuh invert true agar warna tidak terbalik
+    display.fillScreen(COLOR_BG);
+
+    // Render layout dashboard awal
+    drawDashboardLayout();
+
+    // 4. Inisialisasi UART GPS NEO-6M
     gpsSerial.setRxBufferSize(1024);
     gpsSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
-    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
-    display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.display();
-
+    // 5. Load Odometer dari Flash NVRAM
     preferences.begin("speedo", false);
     loadOdo();
 
+    // 6. Security Client TLS Firebase
     firebaseClient.setInsecure();
 
-    Serial.println(F("=== SPEEDOMETER & REALTIME NTP CLOCK READY ==="));
+    Serial.println(F("====================================================="));
+    Serial.println(F(" VEHICLE MONITOR - TFT ST7789 240x240 READY! "));
+    Serial.println(F("====================================================="));
 
     wifiRetry = millis() - 2000;
     wifiState = WIFI_IDLE;
@@ -600,7 +763,7 @@ void loop() {
     updateDateTime();
     updateWarning();
     updateLED();
-    updateOLED();
+    updateTFT();
 
     sendTelemetryToWeb();
     syncSpeedLimitFromWeb();
