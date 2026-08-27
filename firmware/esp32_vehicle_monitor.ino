@@ -19,7 +19,7 @@ const char* password = "cicing77";
 const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 // ============================================================
-// 2. PIN CONFIGURATION (ESP32-C3) - AMAN BEBAS STRAPPING PIN
+// 2. PIN CONFIGURATION (ESP32-C3) - AMAN & STABIL
 // ============================================================
 // GPS NEO-6M UART
 #define GPS_RX_PIN     20   // ESP32-C3 RX <-- NEO-6M TX
@@ -27,26 +27,28 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 #define GPS_BAUD       9600
 
 // TFT SPI (ST7789 240x240 IPS Display 7-Pin / 8-Pin)
-// Hubungkan:
-// SCL (SCLK) -> GPIO 4
-// SDA (MOSI) -> GPIO 6
-// RES (RST)  -> GPIO 1
-// DC  (RS)   -> GPIO 2
-// BLK (LED)  -> 3.3V (atau GPIO 5)
-// CS         -> GND (jika ada pin CS)
+// Wiring:
+// 1. GND -> GND ESP32-C3
+// 2. VCC -> 3.3V (atau 5V jika modul ada regulator 3.3V)
+// 3. SCL (SCLK) -> GPIO 4
+// 4. SDA (MOSI) -> GPIO 6
+// 5. RES (RST)  -> GPIO 1
+// 6. DC  (RS)   -> GPIO 2
+// 7. BLK (LED)  -> Hubungkan LANGSUNG ke pin 3.3V (Wajib ada tegangan agar lampu layar hidup)
+// 8. CS (jika ada) -> GND
 #define TFT_SCLK_PIN   4    // SPI Clock (SCL di modul TFT)
 #define TFT_MOSI_PIN   6    // SPI Data (SDA di modul TFT)
 #define TFT_RST_PIN    1    // Reset (RES di modul TFT)
 #define TFT_DC_PIN     2    // Data/Command (DC di modul TFT)
-#define TFT_CS_PIN    -1    // -1 jika CS sudah di-ground internal modul
-#define TFT_BLK_PIN    5    // Backlight control (atau jumper ke 3.3V)
+#define TFT_CS_PIN     7    // CS Pin (Jika modul 7-pin tanpa CS, pin ini berfungsi sbg software CS)
+#define TFT_BLK_PIN    5    // Pin BLK (Bisa di-jumper langsung ke 3.3V)
 
 #define SCREEN_WIDTH   240
 #define SCREEN_HEIGHT  240
 
 // LED Indikator Fisik
 #define GREEN_LED_PIN  0    // LED Hijau (Status Normal / Standby)
-#define ORANGE_LED_PIN 3    // LED Oren (Warning Speed / Flash Test Pin 4)
+#define ORANGE_LED_PIN 3    // LED Oren (Warning Speed / Flash Test Pin 3)
 
 // ============================================================
 // 3. PALET WARNA TFT 16-BIT (RGB565 AUTOMOTIVE THEME)
@@ -723,14 +725,30 @@ void setup() {
     pinMode(TFT_BLK_PIN, OUTPUT);
     digitalWrite(TFT_BLK_PIN, HIGH);
 
-    // 2. Inisialisasi Bus Hardware SPI ESP32-C3 (SCLK, MISO, MOSI, SS)
-    SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, -1);
+    // 2. Hardware Reset ST7789 Manual Pulse (Wajib agar chip keluar dari Sleep Mode)
+    pinMode(TFT_RST_PIN, OUTPUT);
+    digitalWrite(TFT_RST_PIN, HIGH);
+    delay(30);
+    digitalWrite(TFT_RST_PIN, LOW);
+    delay(60);
+    digitalWrite(TFT_RST_PIN, HIGH);
+    delay(150);
 
-    // 3. Inisialisasi ST7789 TFT 240x240
-    // SPI_MODE2 adalah mode standar paling kompatibel untuk modul ST7789 7-pin tanpa CS
-    display.init(SCREEN_WIDTH, SCREEN_HEIGHT, SPI_MODE2);
+    // 3. Inisialisasi Bus Hardware SPI ESP32-C3
+    SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, TFT_CS_PIN);
+
+    // 4. Inisialisasi ST7789 TFT 240x240
+    display.init(SCREEN_WIDTH, SCREEN_HEIGHT);
     display.setRotation(0);          // Rotasi 0-3 (0: Normal vertikal)
     display.invertDisplay(true);     // ST7789 IPS butuh invert true agar warna tidak terbalik
+
+    // 5. Visual Startup Flash Test (Merah -> Hijau -> Biru)
+    display.fillScreen(ST77XX_RED);
+    delay(200);
+    display.fillScreen(ST77XX_GREEN);
+    delay(200);
+    display.fillScreen(ST77XX_BLUE);
+    delay(200);
     display.fillScreen(COLOR_BG);
 
     // Render layout dashboard awal
