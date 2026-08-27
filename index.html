@@ -6,6 +6,20 @@
   <title>Vehicle Monitor - Dashboard</title>
   <meta name="description" content="Vehicle Monitor dashboard with real-time overview, trip meter, speed limiter, and maintenance reminders.">
 
+  <!-- Force Clear Mobile Cache & SW Script -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for(let r of regs) r.unregister();
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let n of names) caches.delete(n);
+      });
+    }
+  </script>
+
   <!-- Cache Control (Always Serve Fresh UI to Phones) -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -26,7 +40,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./css/style.css?v=20260827_2d_flat">
+  <link rel="stylesheet" href="./css/style.css?v=20260827_semicircle_final">
 </head>
 <body>
 
@@ -648,6 +662,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="./js/app.js?v=20260827_2d_flat"></script>
+  <script type="module" src="./js/app.js?v=20260827_semicircle_final"></script>
 </body>
 </html>
