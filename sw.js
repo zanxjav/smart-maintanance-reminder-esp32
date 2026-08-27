@@ -1,9 +1,11 @@
-const CACHE_NAME = 'vehicle-monitor-v4';
+const CACHE_NAME = 'vehicle-monitor-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './css/style.css?v=5',
   './js/app.js',
+  './js/app.js?v=5',
   './js/maintenance-engine.js',
   './js/telemetry-service.js',
   './manifest.json',
