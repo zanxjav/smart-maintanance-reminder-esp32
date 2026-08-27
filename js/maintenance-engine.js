@@ -102,18 +102,18 @@ export const DEFAULT_MAINTENANCE_SETTINGS = {
   }
 };
 
-// Initial clean maintenance state
+// Initial clean maintenance state calibrated for 97,248 KM vehicle
 export const DEFAULT_MAINTENANCE_STATE = {
-  oil_engine: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 10000, nextServiceDate: "", status: "NORMAL" },
-  oil_filter: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 10000, nextServiceDate: "", status: "NORMAL" },
-  air_filter: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 20000, nextServiceDate: "", status: "NORMAL" },
-  coolant: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 40000, nextServiceDate: "", status: "NORMAL" },
-  spark_plug: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 30000, nextServiceDate: "", status: "NORMAL" },
-  transmission_oil: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 40000, nextServiceDate: "", status: "NORMAL" },
-  brake_fluid: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 20000, nextServiceDate: "", status: "NORMAL" },
-  brake_pad: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 30000, nextServiceDate: "", status: "NORMAL" },
-  battery: { lastServiceOdo: 0, lastServiceDate: "", nextServiceOdo: 50000, nextServiceDate: "", status: "NORMAL" },
-  tire: { lastServiceOdo: 0, lastServiceDate: "", nextServiceDate: "", nextServiceOdo: 40000, status: "NORMAL" }
+  oil_engine: { lastServiceOdo: 95000, lastServiceDate: "2026-08-01", nextServiceOdo: 105000, nextServiceDate: "2026-10-01", status: "NORMAL" },
+  oil_filter: { lastServiceOdo: 95000, lastServiceDate: "2026-08-01", nextServiceOdo: 105000, nextServiceDate: "2026-10-01", status: "NORMAL" },
+  air_filter: { lastServiceOdo: 80000, lastServiceDate: "2026-06-01", nextServiceOdo: 120000, nextServiceDate: "2026-12-01", status: "NORMAL" },
+  coolant: { lastServiceOdo: 80000, lastServiceDate: "2026-01-01", nextServiceOdo: 120000, nextServiceDate: "2027-01-01", status: "NORMAL" },
+  spark_plug: { lastServiceOdo: 80000, lastServiceDate: "2026-01-01", nextServiceOdo: 110000, nextServiceDate: "2027-01-01", status: "NORMAL" },
+  transmission_oil: { lastServiceOdo: 80000, lastServiceDate: "2025-08-01", nextServiceOdo: 120000, nextServiceDate: "2027-08-01", status: "NORMAL" },
+  brake_fluid: { lastServiceOdo: 90000, lastServiceDate: "2026-03-01", nextServiceOdo: 110000, nextServiceDate: "2027-03-01", status: "NORMAL" },
+  brake_pad: { lastServiceOdo: 85000, lastServiceDate: "2026-02-01", nextServiceOdo: 115000, nextServiceDate: "2027-08-01", status: "NORMAL" },
+  battery: { lastServiceOdo: 80000, lastServiceDate: "2025-10-01", nextServiceOdo: 130000, nextServiceDate: "2027-10-01", status: "NORMAL" },
+  tire: { lastServiceOdo: 90000, lastServiceDate: "2026-05-01", nextServiceOdo: 130000, nextServiceDate: "2029-05-01", status: "NORMAL" }
 };
 
 // Clean service history (no dummy records)
@@ -124,7 +124,7 @@ class MaintenanceEngine {
     this.settings = this.loadLocal('scada_maintenance_settings', DEFAULT_MAINTENANCE_SETTINGS);
     this.state = this.loadLocal('scada_maintenance_state', DEFAULT_MAINTENANCE_STATE);
     this.history = this.loadLocal('scada_service_history', DEFAULT_SERVICE_HISTORY);
-    this.currentOdo = 0;
+    this.currentOdo = 97248;
   }
 
   loadLocal(key, fallback) {
@@ -132,8 +132,12 @@ class MaintenanceEngine {
       const data = localStorage.getItem(key);
       if (data) {
         const parsed = JSON.parse(data);
-        // If it contains old demo dummy items, reset to clean fallback
+        // If it contains old demo dummy items or uninitialized 0 ODO state, reset to clean fallback
         if (key === 'scada_service_history' && Array.isArray(parsed) && parsed.some(x => x.id && x.id.startsWith('srv_demo'))) {
+          localStorage.removeItem(key);
+          return fallback;
+        }
+        if (key === 'scada_maintenance_state' && parsed.oil_engine && parsed.oil_engine.lastServiceOdo === 0) {
           localStorage.removeItem(key);
           return fallback;
         }

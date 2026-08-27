@@ -421,81 +421,128 @@ body {
   color: var(--text-muted);
 }
 
-/* Center Speed Semi-Gauge */
-.speed-gauge-display {
+/* ==========================================================================
+   SPORT AUTOMOTIVE ANALOG SPEEDOMETER CLUSTER (RESPONSIVE MOBILE)
+   ========================================================================== */
+.analog-speedometer-display {
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
-  padding: 0.4rem 0 0;
+  width: 100%;
+  padding: 0.2rem 0;
 }
 
-.gauge-svg-wrap {
+.analog-svg-wrap {
   position: relative;
-  width: 220px;
-  height: 115px;
+  width: 100%;
+  max-width: 310px;
+  height: auto;
+  aspect-ratio: 280 / 210;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
 }
 
-.gauge-svg-wrap svg {
+.analog-speed-svg {
   width: 100%;
   height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.45));
 }
 
-.gauge-track-bg {
+.analog-track-bg {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 16;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 3.5;
+}
+
+.speed-redline-arc {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 5.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.85));
+  transition: all 0.3s ease;
+}
+
+.analog-tick-major {
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+}
+
+.analog-tick-minor {
+  stroke: rgba(203, 213, 225, 0.45);
+  stroke-width: 1.5;
   stroke-linecap: round;
 }
 
-.gauge-track-fill {
-  fill: none;
-  stroke: #38bdf8;
-  stroke-width: 16;
-  stroke-linecap: round;
-  stroke-dasharray: 236;
-  stroke-dashoffset: 236; /* Default empty at 0 km/h */
-  transition: stroke-dashoffset 0.4s var(--ease-spring), stroke 0.3s ease;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.4));
+.analog-tick-num {
+  fill: #ffffff;
+  font-size: 11.5px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+  text-anchor: middle;
+  dominant-baseline: central;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
 }
 
-.gauge-center-text {
+#analogNeedleGroup {
+  transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transform-origin: 140px 135px;
+}
+
+#speedNeedleBody {
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.9));
+  transition: fill 0.3s ease, filter 0.3s ease;
+}
+
+#needleCenterDot {
+  transition: fill 0.3s ease;
+}
+
+.analog-center-display {
   position: absolute;
-  bottom: 0;
+  bottom: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  pointer-events: none;
 }
 
-.gauge-speed-num {
-  font-size: 2.7rem;
+.analog-speed-num {
+  font-size: 2.6rem;
   font-weight: 900;
   color: #ffffff;
   line-height: 1;
   letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+  transition: color 0.3s ease;
 }
 
-.gauge-speed-unit {
-  font-size: 0.82rem;
-  font-weight: 600;
+.analog-speed-unit {
+  font-size: 0.72rem;
+  font-weight: 800;
   color: var(--text-muted);
-  margin-top: 2px;
+  letter-spacing: 1px;
+  margin-top: 1px;
 }
 
-.gauge-scale-labels {
-  width: 220px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.78rem;
+.analog-speed-limit-tag {
+  font-size: 0.65rem;
   font-weight: 700;
-  color: var(--text-muted);
-  margin-top: 0.2rem;
-  padding: 0 0.5rem;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 1px 8px;
+  border-radius: 999px;
+  margin-top: 3px;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
 }
 
 /* Speed Limit Banner */

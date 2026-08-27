@@ -1,62 +1,46 @@
-const CACHE_NAME = 'vehicle-monitor-v5';
-const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './css/style.css',
-  './css/style.css?v=5',
-  './js/app.js',
-  './js/app.js?v=5',
-  './js/maintenance-engine.js',
-  './js/telemetry-service.js',
-  './manifest.json',
-  './assets/icons/icon.svg',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
-];
+const CACHE_NAME = 'vehicle-monitor-v2026-sport-analog-v2';
 
-// Install: Pre-cache static shell
+// Install: Pre-cache static shell & skip waiting immediately
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
 });
 
-// Activate: Clean old caches
+// Activate: Purge ALL old caches immediately & claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => {
+          console.log('[SW] Deleting legacy cache:', key);
+          return caches.delete(key);
+        })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: Stale-while-revalidate for local assets, network-first for Firebase realtime APIs
+// Fetch: Network-First strategy (always serve fresh updates immediately)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Bypass cache for Firebase realtime stream and APIs
-  if (url.origin.includes('firebaseio.com') || url.origin.includes('firebasedatabase.app')) {
+  // Bypass cache completely for Firebase, APIs, or non-GET
+  if (url.origin.includes('firebaseio.com') || url.origin.includes('firebasedatabase.app') || event.request.method !== 'GET') {
     return;
   }
 
+  // Network-First: Always try network first to ensure mobile phones get live updates
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch fresh copy in background
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-      return fetch(event.request);
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // Fallback to cache ONLY if device is totally offline
+        return caches.match(event.request);
+      })
   );
 });

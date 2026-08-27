@@ -84,12 +84,21 @@ function handleSsePayload(payload) {
 export function initFirebaseRealtime() {
   const streamUrl = `${FIREBASE_DB_URL}/vehicle/current.json`;
   
-  // Initial fetch for instant display
+  // Initial fetch for instant display & auto-cleanup of stale Firebase dummy records
   fetch(streamUrl)
     .then(res => res.json())
     .then(data => {
       if (data && typeof data === 'object') {
-        handleIncomingData(data);
+        // If Firebase RTDB still had 97022 or uncalibrated ODO, force-clean it in the cloud!
+        if (data.odo && (Number(data.odo) < 97248 || Number(data.odo) === 97022)) {
+          fetch(`${FIREBASE_DB_URL}/vehicle/current/odo.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(97248)
+          }).catch(() => {});
+          data.odo = 97248;
+        }
+        handleIncomingData(data, true);
       }
     })
     .catch(err => console.warn('[Firebase] Initial fetch error:', err));
@@ -131,32 +140,43 @@ export function initFirebaseRealtime() {
     });
 
     eventSource.onopen = () => {
-      isConnected = true;
-      dispatchLocalUpdate('connection', { connected: true, mode: 'FIREBASE_LIVE', status: 'Live Telemetry' });
+      // SSE connection open to Firebase
     };
 
     eventSource.onerror = () => {
-      isConnected = false;
-      dispatchLocalUpdate('connection', { connected: false, mode: 'RECONNECTING', status: 'Connecting...' });
+      if (isConnected) {
+        isConnected = false;
+        dispatchLocalUpdate('connection', { connected: false, mode: 'RECONNECTING', status: 'Connecting...' });
+      }
     };
   } catch (err) {
     console.error('[Firebase] EventSource error:', err);
   }
 
-  // Heartbeat watchdog (fallback poll every 3s in case SSE drops)
+  // Active Hardware Heartbeat Watchdog (Runs every 1s)
+  // If no fresh packet received from ESP32 for > 3.5 seconds, vehicle is considered offline & speed drops to 0
   setInterval(() => {
-    fetch(streamUrl)
-      .then(res => res.json())
-      .then(data => {
-        if (data && typeof data === 'object') handleIncomingData(data);
-      })
-      .catch(() => {});
-  }, 3000);
+    const elapsed = Date.now() - lastDataTime;
+    if (elapsed > 3500 && isConnected) {
+      isConnected = false;
+      currentTelemetryState.speed = 0;
+      currentTelemetryState.rawSpeed = 0;
+      currentTelemetryState.esp32 = 'Offline';
+      dispatchLocalUpdate('connection', { connected: false, mode: 'OFFLINE', status: 'Standby' });
+      dispatchLocalUpdate('vehicle', { ...currentTelemetryState, speed: 0, rawSpeed: 0, esp32: 'Offline' });
+    }
+  }, 1000);
 }
 
-function handleIncomingData(data) {
+function handleIncomingData(data, isInitial = false) {
   if (!data || typeof data !== 'object') return;
+  
+  // Update packet arrival timestamp
   lastDataTime = Date.now();
+  if (!isConnected) {
+    isConnected = true;
+    dispatchLocalUpdate('connection', { connected: true, mode: 'FIREBASE_LIVE', status: 'Live Telemetry' });
+  }
 
   // Merge selectively into persistent telemetry state without resetting untouched properties
   if (data.speed !== undefined && !isNaN(Number(data.speed))) {
@@ -167,9 +187,19 @@ function handleIncomingData(data) {
   } else if (data.speed !== undefined) {
     currentTelemetryState.rawSpeed = Number(data.speed);
   }
-  if (data.odo !== undefined && !isNaN(Number(data.odo)) && Number(data.odo) > 0) {
-    currentTelemetryState.odo = Number(data.odo);
+  
+  // ODO normalization: Any value less than 97248 or equal to 97022 is strictly corrected to 97248
+  if (data.odo !== undefined && !isNaN(Number(data.odo))) {
+    const parsedOdo = Number(data.odo);
+    if (parsedOdo < 97248 || parsedOdo === 97022) {
+      currentTelemetryState.odo = 97248;
+    } else {
+      currentTelemetryState.odo = parsedOdo;
+    }
+  } else if (!currentTelemetryState.odo || currentTelemetryState.odo < 97248) {
+    currentTelemetryState.odo = 97248;
   }
+
   if (data.trip !== undefined && !isNaN(Number(data.trip))) {
     currentTelemetryState.trip = Number(data.trip);
   }
@@ -291,16 +321,56 @@ export async function writeResetTrip() {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3500);
 
+  // Sync to both endpoints for instant ESP32 & Cloud sync
   fetch(`${FIREBASE_DB_URL}/vehicle/current/trip.json`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(0.0),
+    signal: controller.signal
+  }).catch(() => {});
+
+  fetch(`${FIREBASE_DB_URL}/commands/resetTrip.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active: true, timestamp: Date.now() }),
     signal: controller.signal
   })
     .catch(err => console.warn('[Firebase] Background trip reset sync:', err.message))
     .finally(() => clearTimeout(timeoutId));
 
   return { success: true, trip: 0.0 };
+}
+
+/**
+ * Calibrate / Set Odometer in Firebase & Send Sync Command to ESP32 (Instant & Non-blocking)
+ */
+export async function writeCalibrateOdo(newOdo = 97248) {
+  const odoVal = Number(newOdo);
+  currentTelemetryState.odo = odoVal;
+  dispatchLocalUpdate('vehicle', { odo: odoVal });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  // Sync to vehicle/current/odo.json
+  fetch(`${FIREBASE_DB_URL}/vehicle/current/odo.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(odoVal),
+    signal: controller.signal
+  }).catch(() => {});
+
+  // Send command to ESP32
+  fetch(`${FIREBASE_DB_URL}/commands/setOdo.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active: true, odo: odoVal, timestamp: Date.now() }),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background setOdo sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
+  return { success: true, odo: odoVal };
 }
 
 /**

@@ -35,6 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
   populateServiceModalDropdown();
   maintenanceEngine.setCurrentOdo(currentOdo);
   renderMaintenanceReminders();
+  updateRedlineArc(currentSpeedLimit);
+  updateAnalogNeedle(0, currentSpeedLimit);
+  handleVehicleDataUpdate({ speed: 0, rawSpeed: 0, odo: currentOdo, trip: currentTrip, status: currentStatus });
 
   // 2. Start Realtime Hardware Telemetry (No Dummy Data)
   initFirebaseRealtime();
@@ -113,23 +116,8 @@ function handleVehicleDataUpdate(data) {
     if (speedValEl) speedValEl.textContent = roundedSpeed;
     if (speedLargeEl) speedLargeEl.textContent = roundedSpeed;
 
-    // Speed Gauge Arc calculation (Scale: 0 to 80 km/h)
-    const maxScale = 80;
-    const clampedSpeed = Math.min(maxScale, Math.max(0, currentSpeed));
-    const arcLength = 236; // Radius 75 semi-arc length
-    const offset = arcLength - (clampedSpeed / maxScale) * arcLength;
-
-    const gaugeFill = document.getElementById('speedGaugeFill');
-    if (gaugeFill) {
-      gaugeFill.style.strokeDashoffset = offset;
-      if (currentSpeed > currentSpeedLimit) {
-        gaugeFill.style.stroke = '#ef4444';
-        if (speedValEl) speedValEl.style.color = '#ef4444';
-      } else {
-        gaugeFill.style.stroke = '#38bdf8';
-        if (speedValEl) speedValEl.style.color = '#ffffff';
-      }
-    }
+    // Update Sport Analog Needle & Dial Alert
+    updateAnalogNeedle(currentSpeed, currentSpeedLimit);
 
     // Over-speed alert notification
     const actDot = document.getElementById('recentActivityDot');
@@ -162,9 +150,91 @@ function handleVehicleDataUpdate(data) {
   }
 }
 
+/**
+ * Dynamic Redline Arc based on configured Speed Limit (Scale 0 to 140 km/h)
+ */
+export function updateRedlineArc(speedLimitVal) {
+  const maxScale = 140;
+  const limit = Math.min(135, Math.max(20, Number(speedLimitVal) || 60));
+  const redlineArc = document.getElementById('speedRedlineArc');
+  const badgeEl = document.getElementById('analogSpeedLimitBadge');
+
+  if (badgeEl) {
+    badgeEl.textContent = `LIMIT ${limit}`;
+  }
+
+  if (redlineArc) {
+    // Formula: dial angle for limit in a 240 deg dial (from -210 deg to +30 deg)
+    const startAngleDeg = -210 + (limit / maxScale) * 240;
+    const startAngleRad = startAngleDeg * (Math.PI / 180);
+    const endAngleDeg = 30; // 140 km/h end position
+    const endAngleRad = endAngleDeg * (Math.PI / 180);
+
+    const cx = 140, cy = 135, r = 98;
+    const x1 = cx + r * Math.cos(startAngleRad);
+    const y1 = cy + r * Math.sin(startAngleRad);
+    const x2 = cx + r * Math.cos(endAngleRad);
+    const y2 = cy + r * Math.sin(endAngleRad);
+
+    const deltaAngle = endAngleDeg - startAngleDeg;
+    const largeArc = deltaAngle > 180 ? 1 : 0;
+
+    redlineArc.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`);
+  }
+}
+
+/**
+ * Update Analog Needle rotation & warning styling
+ */
+export function updateAnalogNeedle(speed, limit) {
+  const maxScale = 140;
+  const clampedSpeed = Math.min(maxScale, Math.max(0, speed));
+  // Needle rotation: -120 deg (0 km/h) to +120 deg (140 km/h)
+  const rotationDeg = -120 + (clampedSpeed / maxScale) * 240;
+
+  const needleGroup = document.getElementById('analogNeedleGroup');
+  const needleBody = document.getElementById('speedNeedleBody');
+  const needleCenterDot = document.getElementById('needleCenterDot');
+  const speedValEl = document.getElementById('valSpeed');
+  const speedLargeEl = document.getElementById('valSpeedLarge');
+  const redlineArc = document.getElementById('speedRedlineArc');
+
+  if (needleGroup) {
+    needleGroup.style.transform = `rotate(${rotationDeg.toFixed(1)}deg)`;
+  }
+
+  const isOverSpeed = speed > limit;
+  if (isOverSpeed) {
+    if (needleBody) {
+      needleBody.setAttribute('fill', '#ef4444');
+      needleBody.style.filter = 'drop-shadow(0 0 10px #ef4444)';
+    }
+    if (needleCenterDot) needleCenterDot.setAttribute('fill', '#ef4444');
+    if (speedValEl) speedValEl.style.color = '#ef4444';
+    if (speedLargeEl) speedLargeEl.style.color = '#ef4444';
+    if (redlineArc) {
+      redlineArc.style.stroke = '#ef4444';
+      redlineArc.style.filter = 'drop-shadow(0 0 14px #ef4444)';
+    }
+  } else {
+    if (needleBody) {
+      needleBody.setAttribute('fill', '#38bdf8');
+      needleBody.style.filter = 'drop-shadow(0 0 8px rgba(56, 189, 248, 0.8))';
+    }
+    if (needleCenterDot) needleCenterDot.setAttribute('fill', '#38bdf8');
+    if (speedValEl) speedValEl.style.color = '#ffffff';
+    if (speedLargeEl) speedLargeEl.style.color = '#ffffff';
+    if (redlineArc) {
+      redlineArc.style.stroke = '#ef4444';
+      redlineArc.style.filter = 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.75))';
+    }
+  }
+}
+
 function updateSpeedLimitDisplay(limit) {
   const display = document.getElementById('valSpeedLimitDisplay');
   if (display) display.textContent = `${limit} km/h`;
+  updateRedlineArc(limit);
 }
 
 /* ==========================================================================
@@ -672,12 +742,15 @@ function setupFlashTestController() {
 }
 
 /* ==========================================================================
-   SERVICE WORKER REGISTRATION (NATIVE PWA SUPPORT)
+   SERVICE WORKER REGISTRATION (NATIVE PWA SUPPORT & FORCE UPDATE)
    ========================================================================== */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('[PWA] Service Worker Active'))
+    navigator.serviceWorker.register('./sw.js?v=20260827_sport_analog')
+      .then((reg) => {
+        console.log('[PWA] Service Worker Active (v20260827_sport_analog)');
+        reg.update();
+      })
       .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
   });
 }
