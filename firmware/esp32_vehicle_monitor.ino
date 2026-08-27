@@ -66,6 +66,7 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 #define COLOR_GREEN     0x25F0  // Bright Emerald (#10B981)
 #define COLOR_AMBER     0xFD00  // Warning Amber (#F59E0B)
 #define COLOR_RED       0xF9A6  // Alert Crimson (#EF4444)
+#define COLOR_BLUE      0x001F  // Standard Blue
 #define COLOR_WHITE     0xFFFF  // Pure White
 #define COLOR_TEXT_MUTED 0x9514 // Muted Slate Text (#94A3B8)
 
@@ -532,12 +533,12 @@ void drawDashboardLayout() {
     display.fillScreen(COLOR_BG);
 
     // 1. Header Bar (y: 0 - 32)
-    display.fillRoundRect(6, 6, 228, 28, 6, COLOR_CARD_BG);
-    display.drawRoundRect(6, 6, 228, 28, 6, COLOR_BORDER);
+    display.fillRect(6, 6, 228, 28, COLOR_CARD_BG);
+    display.drawRect(6, 6, 228, 28, COLOR_BORDER);
 
     // 2. Speedometer Center Gauge Card (y: 38 - 165)
-    display.fillRoundRect(6, 38, 228, 126, 10, COLOR_CARD_BG);
-    display.drawRoundRect(6, 38, 228, 126, 10, COLOR_BORDER);
+    display.fillRect(6, 38, 228, 126, COLOR_CARD_BG);
+    display.drawRect(6, 38, 228, 126, COLOR_BORDER);
 
     // Static label "KM/H"
     display.setTextSize(2);
@@ -547,16 +548,16 @@ void drawDashboardLayout() {
 
     // 3. Bottom Cards (y: 168 - 234)
     // ODO Card (Left)
-    display.fillRoundRect(6, 168, 111, 66, 8, COLOR_CARD_BG);
-    display.drawRoundRect(6, 168, 111, 66, 8, COLOR_BORDER);
+    display.fillRect(6, 168, 111, 66, COLOR_CARD_BG);
+    display.drawRect(6, 168, 111, 66, COLOR_BORDER);
     display.setTextSize(1);
     display.setTextColor(COLOR_TEXT_MUTED);
     display.setCursor(14, 175);
     display.print("TOTAL ODO");
 
     // TRIP Card (Right)
-    display.fillRoundRect(123, 168, 111, 66, 8, COLOR_CARD_BG);
-    display.drawRoundRect(123, 168, 111, 66, 8, COLOR_BORDER);
+    display.fillRect(123, 168, 111, 66, COLOR_CARD_BG);
+    display.drawRect(123, 168, 111, 66, COLOR_BORDER);
     display.setTextSize(1);
     display.setTextColor(COLOR_TEXT_MUTED);
     display.setCursor(131, 175);
@@ -626,12 +627,12 @@ void updateTFT() {
         display.fillRect(80, 10, 80, 20, COLOR_CARD_BG);
         display.setTextSize(1);
         if (flashTestActive) {
-            display.fillRoundRect(82, 11, 76, 18, 4, COLOR_AMBER);
+            display.fillRect(82, 11, 76, 18, COLOR_AMBER);
             display.setTextColor(COLOR_BG, COLOR_AMBER);
             display.setCursor(88, 16);
             display.print("FLASH TEST");
         } else if (wifiState == WIFI_CONNECTED) {
-            display.fillRoundRect(88, 11, 64, 18, 4, COLOR_GREEN);
+            display.fillRect(88, 11, 64, 18, COLOR_GREEN);
             display.setTextColor(COLOR_BG, COLOR_GREEN);
             display.setCursor(96, 16);
             display.print("LIVE IOT");
