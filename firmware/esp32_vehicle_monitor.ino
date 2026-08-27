@@ -26,29 +26,37 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 #define GPS_TX_PIN     21   // ESP32-C3 TX --> NEO-6M RX
 #define GPS_BAUD       9600
 
-// TFT SPI (ST7789 240x240 IPS Display 7-Pin / 8-Pin)
-// Wiring:
-// 1. GND -> GND ESP32-C3
-// 2. VCC -> 3.3V (atau 5V jika modul ada regulator 3.3V)
-// 3. SCL (SCLK) -> GPIO 4
-// 4. SDA (MOSI) -> GPIO 6
-// 5. RES (RST)  -> GPIO 1
-// 6. DC  (RS)   -> GPIO 2
-// 7. BLK (LED)  -> Hubungkan LANGSUNG ke pin 3.3V (Wajib ada tegangan agar lampu layar hidup)
-// 8. CS (jika ada) -> GND
-#define TFT_SCLK_PIN   4    // SPI Clock (SCL di modul TFT)
-#define TFT_MOSI_PIN   6    // SPI Data (SDA di modul TFT)
-#define TFT_RST_PIN    1    // Reset (RES di modul TFT)
-#define TFT_DC_PIN     2    // Data/Command (DC di modul TFT)
-#define TFT_CS_PIN     7    // CS Pin (Jika modul 7-pin tanpa CS, pin ini berfungsi sbg software CS)
-#define TFT_BLK_PIN    5    // Pin BLK (Bisa di-jumper langsung ke 3.3V)
+// TFT ST7789 240x240 IPS (Modul 7-Pin, Tanpa Pin CS)
+// *** MENGGUNAKAN SOFTWARE SPI (BIT-BANG) - 100% RELIABLE ***
+//
+// WIRING MODUL TFT 7-PIN ke ESP32-C3:
+// ┌────────────────────────────────────────────────┐
+// │ Pin Modul TFT  │  Sambung ke ESP32-C3          │
+// ├────────────────┼───────────────────────────────┤
+// │ 1. GND         │  GND                          │
+// │ 2. VCC         │  3.3V  (coba 5V kalau blank)  │
+// │ 3. SCL (SCLK)  │  GPIO 4                       │
+// │ 4. SDA (MOSI)  │  GPIO 6                       │
+// │ 5. RES (RST)   │  GPIO 7                       │
+// │ 6. DC  (RS)    │  GPIO 10                      │
+// │ 7. BLK (LED)   │  3.3V  (LANGSUNG, bukan GPIO) │
+// └────────────────────────────────────────────────┘
+//
+// PENTING: Pin BLK WAJIB disambung ke 3.3V agar backlight nyala!
+// JANGAN biarkan pin BLK mengambang (tidak tersambung).
+
+#define TFT_SCLK_PIN   4    // SPI Clock  -> pin SCL di modul TFT
+#define TFT_MOSI_PIN   6    // SPI Data   -> pin SDA di modul TFT
+#define TFT_RST_PIN    7    // Reset      -> pin RES di modul TFT
+#define TFT_DC_PIN     10   // Data/Cmd   -> pin DC  di modul TFT
+#define TFT_BLK_PIN    5    // Backlight  -> atau jumper BLK ke 3.3V langsung
 
 #define SCREEN_WIDTH   240
 #define SCREEN_HEIGHT  240
 
 // LED Indikator Fisik
-#define GREEN_LED_PIN  0    // LED Hijau (Status Normal / Standby)
-#define ORANGE_LED_PIN 3    // LED Oren (Warning Speed / Flash Test Pin 3)
+#define GREEN_LED_PIN  0    // LED Hijau (Normal)
+#define ORANGE_LED_PIN 3    // LED Oren (Warning / Flash Test)
 
 // ============================================================
 // 3. PALET WARNA TFT 16-BIT (RGB565 AUTOMOTIVE THEME)
@@ -83,7 +91,9 @@ const char* FIREBASE_HOST = "https://vehicle-monitor-esp32-default-rtdb.asia-sou
 // ============================================================
 TinyGPSPlus gps;
 HardwareSerial gpsSerial(1);
-Adafruit_ST7789 display = Adafruit_ST7789(&SPI, TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN);
+// Software SPI constructor: (CS, DC, MOSI, SCLK, RST)
+// CS = -1 karena modul 7-pin tidak punya pin CS
+Adafruit_ST7789 display = Adafruit_ST7789(-1, TFT_DC_PIN, TFT_MOSI_PIN, TFT_SCLK_PIN, TFT_RST_PIN);
 Preferences preferences;
 WiFiClientSecure firebaseClient;
 
@@ -721,38 +731,50 @@ void setup() {
     digitalWrite(GREEN_LED_PIN, LOW);
     digitalWrite(ORANGE_LED_PIN, LOW);
 
-    // 1. Inisialisasi Backlight TFT (Pin BLK)
+    // ============================================
+    // TFT ST7789 INIT (SOFTWARE SPI - GUARANTEED)
+    // ============================================
+    Serial.println(F("[TFT] Step 1: Backlight ON..."));
     pinMode(TFT_BLK_PIN, OUTPUT);
     digitalWrite(TFT_BLK_PIN, HIGH);
 
-    // 2. Hardware Reset ST7789 Manual Pulse (Wajib agar chip keluar dari Sleep Mode)
+    Serial.println(F("[TFT] Step 2: Hardware Reset Pulse..."));
     pinMode(TFT_RST_PIN, OUTPUT);
     digitalWrite(TFT_RST_PIN, HIGH);
-    delay(30);
+    delay(50);
     digitalWrite(TFT_RST_PIN, LOW);
-    delay(60);
+    delay(150);   // Datasheet: minimum 120ms reset pulse
     digitalWrite(TFT_RST_PIN, HIGH);
-    delay(150);
+    delay(200);   // Wait for chip to wake up
 
-    // 3. Inisialisasi Bus Hardware SPI ESP32-C3
-    SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, TFT_CS_PIN);
-
-    // 4. Inisialisasi ST7789 TFT 240x240
+    Serial.println(F("[TFT] Step 3: Software SPI Init (bit-bang)..."));
+    // Software SPI: library langsung bit-bang ke pin MOSI & SCLK
+    // Tidak perlu SPI.begin() karena TIDAK pakai hardware SPI bus
     display.init(SCREEN_WIDTH, SCREEN_HEIGHT);
-    display.setRotation(0);          // Rotasi 0-3 (0: Normal vertikal)
-    display.invertDisplay(true);     // ST7789 IPS butuh invert true agar warna tidak terbalik
+    Serial.println(F("[TFT] Step 4: display.init() DONE"));
 
-    // 5. Visual Startup Flash Test (Merah -> Hijau -> Biru)
+    display.setRotation(0);          // 0=portrait, 2=portrait terbalik
+    display.invertDisplay(true);     // ST7789 IPS perlu invert=true
+
+    // Visual Startup Test: Merah > Hijau > Biru (kalau muncul = TFT WORKS!)
+    Serial.println(F("[TFT] Step 5: Color splash test..."));
     display.fillScreen(ST77XX_RED);
-    delay(200);
+    Serial.println(F("[TFT]   -> RED"));
+    delay(400);
     display.fillScreen(ST77XX_GREEN);
-    delay(200);
+    Serial.println(F("[TFT]   -> GREEN"));
+    delay(400);
     display.fillScreen(ST77XX_BLUE);
-    delay(200);
-    display.fillScreen(COLOR_BG);
+    Serial.println(F("[TFT]   -> BLUE"));
+    delay(400);
+    display.fillScreen(ST77XX_WHITE);
+    Serial.println(F("[TFT]   -> WHITE"));
+    delay(400);
 
-    // Render layout dashboard awal
+    display.fillScreen(COLOR_BG);
+    Serial.println(F("[TFT] Step 6: Drawing dashboard layout..."));
     drawDashboardLayout();
+    Serial.println(F("[TFT] INIT COMPLETE! Display should be visible."));
 
     // 4. Inisialisasi UART GPS NEO-6M
     gpsSerial.setRxBufferSize(1024);
