@@ -40,7 +40,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./css/style.css?v=20260827_semicircle_final">
+  <link rel="stylesheet" href="./css/style.css?v=20260827_zero_overlap">
 </head>
 <body>
 
@@ -216,60 +216,60 @@
           </div>
         </div>
 
-        <!-- Clean Flat 2D Semi-Circular Speedometer with Dynamic Redline -->
+        <!-- Clean Flat 2D Semi-Circular Speedometer (Zero-Overlap Semicircle Layout) -->
         <div class="gauge-2d-display">
           <div class="gauge-2d-wrap">
-            <svg viewBox="0 0 280 148" class="gauge-2d-svg">
-              <!-- 2D Background Semi-Circular Track Arc (Radius 95) -->
-              <path class="gauge-2d-track-bg" d="M 45 120 A 95 95 0 0 1 235 120" />
+            <svg viewBox="0 0 280 120" class="gauge-2d-svg">
+              <!-- 2D Background Semi-Circular Track Arc (Radius 85, Baseline y=100) -->
+              <path class="gauge-2d-track-bg" d="M 55 100 A 85 85 0 0 1 225 100" />
 
               <!-- Dynamic 2D Redline Arc (Integrated with Speed Limit) -->
-              <path id="speedRedlineArc" class="gauge-2d-redline" d="M 118.9 27.4 A 95 95 0 0 1 235 120" />
+              <path id="speedRedlineArc" class="gauge-2d-redline" d="M 121.1 17.1 A 85 85 0 0 1 225 100" />
 
               <!-- Minor Ticks (10, 30, 50, 70, 90, 110, 130 km/h) -->
               <g class="gauge-2d-minor-ticks">
-                <line x1="47.4" y1="98.9" x2="43.5" y2="98.0" class="gauge-2d-tick-minor" />
-                <line x1="65.7" y1="60.8" x2="62.6" y2="58.4" class="gauge-2d-tick-minor" />
-                <line x1="98.8" y1="34.4" x2="97.1" y2="30.8" class="gauge-2d-tick-minor" />
-                <line x1="140.0" y1="25.0" x2="140.0" y2="21.0" class="gauge-2d-tick-minor" />
-                <line x1="181.2" y1="34.4" x2="182.9" y2="30.8" class="gauge-2d-tick-minor" />
-                <line x1="214.3" y1="60.8" x2="217.4" y2="58.4" class="gauge-2d-tick-minor" />
-                <line x1="232.6" y1="98.9" x2="236.5" y2="98.0" class="gauge-2d-tick-minor" />
+                <line x1="57.1" y1="81.1" x2="53.2" y2="80.2" class="gauge-2d-tick-minor" />
+                <line x1="73.5" y1="47.0" x2="70.7" y2="44.5" class="gauge-2d-tick-minor" />
+                <line x1="103.1" y1="23.4" x2="101.5" y2="19.8" class="gauge-2d-tick-minor" />
+                <line x1="140.0" y1="15.0" x2="140.0" y2="11.0" class="gauge-2d-tick-minor" />
+                <line x1="176.9" y1="23.4" x2="178.5" y2="19.8" class="gauge-2d-tick-minor" />
+                <line x1="206.5" y1="47.0" x2="209.3" y2="44.5" class="gauge-2d-tick-minor" />
+                <line x1="222.9" y1="81.1" x2="226.8" y2="80.2" class="gauge-2d-tick-minor" />
               </g>
 
               <!-- Major Ticks (0, 20, 40, 60, 80, 100, 120, 140 km/h) -->
               <g class="gauge-2d-major-ticks">
-                <line x1="45.0" y1="120.0" x2="37.0" y2="120.0" class="gauge-2d-tick-major" />
-                <line x1="54.4" y1="78.8" x2="47.2" y2="75.3" class="gauge-2d-tick-major" />
-                <line x1="80.8" y1="45.7" x2="75.8" y2="39.5" class="gauge-2d-tick-major" />
-                <line x1="118.9" y1="27.4" x2="117.1" y2="19.6" class="gauge-2d-tick-major" />
-                <line x1="161.1" y1="27.4" x2="162.9" y2="19.6" class="gauge-2d-tick-major" />
-                <line x1="199.2" y1="45.7" x2="204.2" y2="39.5" class="gauge-2d-tick-major" />
-                <line x1="225.6" y1="78.8" x2="232.8" y2="75.3" class="gauge-2d-tick-major" />
-                <line x1="235.0" y1="120.0" x2="243.0" y2="120.0" class="gauge-2d-tick-major" />
+                <line x1="55.0" y1="100.0" x2="47.0" y2="100.0" class="gauge-2d-tick-major" />
+                <line x1="63.4" y1="63.1" x2="56.2" y2="59.6" class="gauge-2d-tick-major" />
+                <line x1="87.0" y1="33.5" x2="82.0" y2="27.3" class="gauge-2d-tick-major" />
+                <line x1="121.1" y1="17.1" x2="119.3" y2="9.3" class="gauge-2d-tick-major" />
+                <line x1="158.9" y1="17.1" x2="160.7" y2="9.3" class="gauge-2d-tick-major" />
+                <line x1="193.0" y1="33.5" x2="198.0" y2="27.3" class="gauge-2d-tick-major" />
+                <line x1="216.6" y1="63.1" x2="223.8" y2="59.6" class="gauge-2d-tick-major" />
+                <line x1="225.0" y1="100.0" x2="233.0" y2="100.0" class="gauge-2d-tick-major" />
               </g>
 
-              <!-- Scale Numbers (0 to 140) -->
+              <!-- Scale Numbers (0 to 140, Perfectly Spaced Above Baseline) -->
               <g class="gauge-2d-labels">
-                <text x="60.0" y="116.0" class="gauge-2d-tick-num">0</text>
-                <text x="69.7" y="86.2" class="gauge-2d-tick-num">20</text>
-                <text x="91.4" y="59.0" class="gauge-2d-tick-num">40</text>
-                <text x="122.6" y="44.0" class="gauge-2d-tick-num">60</text>
-                <text x="157.4" y="44.0" class="gauge-2d-tick-num">80</text>
-                <text x="188.6" y="59.0" class="gauge-2d-tick-num">100</text>
-                <text x="210.3" y="86.2" class="gauge-2d-tick-num">120</text>
-                <text x="220.0" y="116.0" class="gauge-2d-tick-num">140</text>
+                <text x="74.0" y="84.0" class="gauge-2d-tick-num">0</text>
+                <text x="79.0" y="71.0" class="gauge-2d-tick-num">20</text>
+                <text x="98.0" y="48.0" class="gauge-2d-tick-num">40</text>
+                <text x="125.0" y="35.0" class="gauge-2d-tick-num">60</text>
+                <text x="155.0" y="35.0" class="gauge-2d-tick-num">80</text>
+                <text x="182.0" y="48.0" class="gauge-2d-tick-num">100</text>
+                <text x="201.0" y="71.0" class="gauge-2d-tick-num">120</text>
+                <text x="206.0" y="84.0" class="gauge-2d-tick-num">140</text>
               </g>
 
-              <!-- Clean 2D Needle Assembly -->
-              <g id="analogNeedleGroup" style="transform-origin: 140px 120px; transform: rotate(-90deg);">
-                <polygon points="138,120 140,28 142,120" fill="#38bdf8" id="speedNeedleBody" />
-                <circle cx="140" cy="28" r="2.5" fill="#ffffff" />
-                <circle cx="140" cy="120" r="7" fill="#0f172a" stroke="#38bdf8" stroke-width="2.5" id="needleCenterDot" />
+              <!-- Clean 2D Needle Assembly (Pivoting at Baseline Center 140, 100) -->
+              <g id="analogNeedleGroup" style="transform-origin: 140px 100px; transform: rotate(-90deg);">
+                <polygon points="138.5,100 140,22 141.5,100" fill="#38bdf8" id="speedNeedleBody" />
+                <circle cx="140" cy="22" r="2" fill="#ffffff" />
+                <circle cx="140" cy="100" r="5" fill="#0b1120" stroke="#38bdf8" stroke-width="2" id="needleCenterDot" />
               </g>
             </svg>
 
-            <!-- Flat 2D Digital Speed Readout -->
+            <!-- Flat 2D Digital Speed Readout (Clean Inset Below Baseline) -->
             <div class="gauge-2d-center-text">
               <span class="gauge-2d-speed-num" id="valSpeedLarge">0</span>
               <span class="gauge-2d-speed-unit">KM/H</span>
@@ -662,6 +662,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="./js/app.js?v=20260827_semicircle_final"></script>
+  <script type="module" src="./js/app.js?v=20260827_zero_overlap"></script>
 </body>
 </html>

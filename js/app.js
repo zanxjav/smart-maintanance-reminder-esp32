@@ -168,11 +168,11 @@ export function updateRedlineArc(speedLimitVal) {
     const startAngleDeg = 180 - (limit / maxScale) * 180;
     const startAngleRad = startAngleDeg * (Math.PI / 180);
 
-    const cx = 140, cy = 120, r = 95;
+    const cx = 140, cy = 100, r = 85;
     const x1 = cx + r * Math.cos(startAngleRad);
     const y1 = cy - r * Math.sin(startAngleRad);
-    const x2 = cx + r; // 235
-    const y2 = cy;     // 120
+    const x2 = cx + r; // 225
+    const y2 = cy;     // 100
 
     redlineArc.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 0 1 ${x2} ${y2}`);
   }
