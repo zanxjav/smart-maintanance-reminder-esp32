@@ -119,11 +119,12 @@ void ST7789_ESP32_7PIN_Lite::begin(uint16_t width, uint16_t height, bool hardwar
     #else
       _spi->begin();
     #endif
-    _spiSettings = SPISettings(_spiFrequency, MSBFIRST, SPI_MODE0);
+    // 7-Pin ST7789 without CS pin requires SPI_MODE3 for reliable communication
+    _spiSettings = SPISettings(_spiFrequency, MSBFIRST, SPI_MODE3);
   } else {
     _spi = nullptr;
     pinMode(_sclk, OUTPUT); pinMode(_mosi, OUTPUT);
-    digitalWrite(_sclk, LOW); digitalWrite(_mosi, LOW);
+    digitalWrite(_sclk, HIGH); digitalWrite(_mosi, LOW);
   }
 
   hardwareReset();
