@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./css/style.css?v=20260828_ultra_v6">
+  <link rel="stylesheet" href="./css/style.css?v=20260828_ultra_v7">
   <style>
     /* Critical Inline CSS for Zero Cache Failure & Instant Visual Rendering */
     .oled-mode-card {
@@ -178,6 +178,25 @@
       color: #34d399 !important;
       font-size: 1.25rem !important;
       font-weight: 700 !important;
+    }
+    .modal-backdrop {
+      display: none !important;
+      position: fixed !important;
+      top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.82) !important;
+      backdrop-filter: blur(10px) !important;
+      -webkit-backdrop-filter: blur(10px) !important;
+      z-index: 9999 !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 1rem !important;
+      pointer-events: none !important;
+    }
+    .modal-backdrop.open {
+      display: flex !important;
+      pointer-events: auto !important;
     }
   </style>
 </head>
@@ -908,6 +927,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="./js/app.js?v=20260828_ultra_v6"></script>
+  <script type="module" src="./js/app.js?v=20260828_ultra_v7"></script>
 </body>
 </html>
