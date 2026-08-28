@@ -856,6 +856,195 @@ body {
 
 
 /* ==========================================================================
+   OLED DISPLAY MODE CONTROLLER CARD (ESP32 LCD HUD)
+   ========================================================================== */
+.oled-mode-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.oled-mode-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.oled-mode-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.oled-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.oled-text-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.oled-mode-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.oled-mode-sub {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.oled-active-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.oled-mode-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-oled-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.btn-oled-mode:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-oled-mode.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  font-weight: 700;
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 3px 12px rgba(2, 132, 199, 0.35);
+}
+
+.btn-oled-mode:active {
+  transform: scale(0.97);
+}
+
+/* ==========================================================================
+   DEDICATED ADD MAINTENANCE ACTION BAR (SPACIOUS & MOBILE OPTIMIZED)
+   ========================================================================== */
+.btn-add-maint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%);
+  border: 1px dashed rgba(16, 185, 129, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  text-align: left;
+  margin-bottom: 0.85rem;
+  user-select: none;
+}
+
+.btn-add-maint-bar:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.12) 100%);
+  border-color: #10b981;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+}
+
+.btn-add-maint-bar:active {
+  transform: scale(0.98);
+}
+
+.btn-add-maint-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-add-maint-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #10b981;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+  flex-shrink: 0;
+}
+
+.btn-add-maint-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.btn-add-maint-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.btn-add-maint-sub {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.btn-add-maint-arrow {
+  color: #10b981;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-right: 2px;
+}
+
+/* ==========================================================================
    MAINTENANCE REMINDERS LIST & INTERACTIVE CONTROLS
    ========================================================================== */
 .m-section-title-group {
@@ -873,39 +1062,6 @@ body {
   padding: 0.15rem 0.55rem;
   border-radius: var(--radius-full);
   letter-spacing: 0.2px;
-}
-
-.m-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.btn-action-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  color: #ffffff;
-  border: none;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.76rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
-  transition: transform 0.15s var(--ease-spring), box-shadow 0.15s ease, background 0.15s ease;
-  user-select: none;
-}
-
-.btn-action-add:hover {
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
-  transform: translateY(-1px);
-}
-
-.btn-action-add:active {
-  transform: scale(0.95);
 }
 
 .section-view-all {

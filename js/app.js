@@ -10,9 +10,11 @@ import {
   subscribeSpeedLimit, 
   subscribeConnectionStatus,
   subscribeFlashTest,
+  subscribeDisplayMode,
   writeSpeedLimit, 
   writeResetTrip,
-  writeFlashTest
+  writeFlashTest,
+  writeDisplayMode
 } from './telemetry-service.js';
 import { maintenanceEngine } from './maintenance-engine.js';
 
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initClock();
   setupUIEvents();
   setupFlashTestController();
+  setupOledModeController();
   setupSpeedLimiterModal();
   setupAddMaintenanceModal();
   setupEditIntervalModal();
@@ -965,5 +968,52 @@ function setupFlashTestController() {
     } else if (!payload.active && isFlashTestActive) {
       stopFlashTest(false);
     }
+  });
+}
+
+/* ==========================================================================
+   OLED DISPLAY MODE CONTROLLER (DASHBOARD SPEEDO vs JAM FULL LAYAR)
+   ========================================================================== */
+let currentOledMode = 0; // 0 = Speedo HUD, 1 = Full Clock
+
+function setupOledModeController() {
+  const btnSpeedo = document.getElementById('btnOledModeSpeedo');
+  const btnClock = document.getElementById('btnOledModeClock');
+  const badgeEl = document.getElementById('oledActiveBadge');
+  const descEl = document.getElementById('oledModeDesc');
+
+  const updateUI = (mode) => {
+    currentOledMode = Number(mode) === 1 ? 1 : 0;
+    if (btnSpeedo) btnSpeedo.classList.toggle('active', currentOledMode === 0);
+    if (btnClock) btnClock.classList.toggle('active', currentOledMode === 1);
+
+    if (badgeEl) {
+      badgeEl.textContent = currentOledMode === 1 ? 'Jam Full 🕒' : 'Mode Biasa';
+      badgeEl.style.background = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)';
+      badgeEl.style.color = currentOledMode === 1 ? '#c084fc' : '#38bdf8';
+      badgeEl.style.borderColor = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(56, 189, 248, 0.3)';
+    }
+
+    if (descEl) {
+      descEl.textContent = currentOledMode === 1 
+        ? 'Tampilan: Jam Digital Ekstra Besar (Full Screen)' 
+        : 'Tampilan: Dashboard Speedometer & Info Kendaraan';
+    }
+  };
+
+  btnSpeedo?.addEventListener('click', () => {
+    updateUI(0);
+    writeDisplayMode(0);
+    showToast('Layar OLED diset ke: Mode Biasa (Speedometer)', 'info');
+  });
+
+  btnClock?.addEventListener('click', () => {
+    updateUI(1);
+    writeDisplayMode(1);
+    showToast('Layar OLED diset ke: Jam Full Layar 🕒', 'success');
+  });
+
+  subscribeDisplayMode((mode) => {
+    updateUI(mode);
   });
 }

@@ -297,10 +297,48 @@
             <span class="btn-trigger-label" id="btnFlashLabel">Test Flash</span>
           </button>
         </div>
+
+        <!-- OLED Display Mode Control Card (ESP32 LCD HUD) -->
+        <div class="oled-mode-card" id="oledModeCard">
+          <div class="oled-mode-header">
+            <div class="oled-mode-title-group">
+              <div class="oled-icon-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+              </div>
+              <div class="oled-text-meta">
+                <span class="oled-mode-title">Mode Layar OLED ESP32</span>
+                <span class="oled-mode-sub" id="oledModeDesc">Tampilan: Dashboard Speedometer</span>
+              </div>
+            </div>
+            <span class="oled-active-tag" id="oledActiveBadge">Mode Biasa</span>
+          </div>
+
+          <div class="oled-mode-toggle-group">
+            <button type="button" class="btn-oled-mode active" id="btnOledModeSpeedo" data-mode="0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <span>Mode Biasa (Speedo)</span>
+            </button>
+
+            <button type="button" class="btn-oled-mode" id="btnOledModeClock" data-mode="1">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 14 10"/>
+              </svg>
+              <span>Jam Full Layar 🕒</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- ====================================================================
-           MAINTENANCE REMINDERS SECTION (DYNAMIC 100% RESPONSIVE)
+           MAINTENANCE REMINDERS SECTION (DYNAMIC & PERFECT MOBILE RESPONSIVE)
            ==================================================================== -->
       <section class="card-section maintenance-section">
         <div class="card-section-header">
@@ -308,14 +346,25 @@
             <h3>Maintenance Reminders</h3>
             <span class="m-count-badge" id="mActiveCountBadge">0 Komponen</span>
           </div>
-          <div class="m-header-actions">
-            <button type="button" class="btn-action-add" id="btnOpenAddMaintenanceQuick" aria-label="Tambah Maintenance">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>+ Add Maintenance</span>
-            </button>
-            <button type="button" class="section-view-all" id="btnViewAllMaintenance">Kelola</button>
-          </div>
+          <button type="button" class="section-view-all" id="btnViewAllMaintenance">Kelola</button>
         </div>
+
+        <!-- Prominent & Clean Add Maintenance Action Bar (Zero Overlap on Mobile) -->
+        <button type="button" class="btn-add-maint-bar" id="btnOpenAddMaintenanceQuick" aria-label="Tambah Komponen Maintenance">
+          <div class="btn-add-maint-left">
+            <div class="btn-add-maint-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </div>
+            <div class="btn-add-maint-text">
+              <span class="btn-add-maint-title">+ Add Maintenance Baru</span>
+              <span class="btn-add-maint-sub">Atur interval servis & komponen kendaraan</span>
+            </div>
+          </div>
+          <span class="btn-add-maint-arrow">›</span>
+        </button>
 
         <div class="maintenance-items-list" id="maintenanceListContainer">
           <!-- Dynamically populated via JS (Zero Lag) -->

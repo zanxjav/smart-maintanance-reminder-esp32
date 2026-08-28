@@ -70,6 +70,7 @@ volatile double tripKm          = 0.0;
 volatile double currentSpeed    = 0.0;
 volatile bool   gpsFix          = false;
 volatile bool   overSpeedActive = false;
+volatile int    oledDisplayMode = 0; // 0: Speedo HUD, 1: Fullscreen Big Clock
 
 // State kendali Flash Test LED Oren (Pin 4)
 volatile bool   flashTestActive = false;
@@ -380,10 +381,35 @@ void updateOLED() {
 
     display.clearDisplay();
 
-    // ----------------------------------------------------
-    // BARIS HEADER (y = 0 s/d 9)
-    // ----------------------------------------------------
-    display.setTextSize(1);
+    // ============================================================
+    // OVER-SPEED ALERT STROBE (PRIORITAS TERTINGGI / FLASHING DISPLAY)
+    // ============================================================
+    if (overSpeedActive) {
+        // Invert screen matching the orange LED blink rate (flashing alert!)
+        display.invertDisplay(blinkState);
+
+        // Warning Header
+        printCentered("! OVERSPEED !", 2, 2);
+
+        // Big Current Speed
+        char spdBuf[16];
+        int displaySpeed = (currentSpeed >= 2.0) ? (int)(currentSpeed + 0.5) : 0;
+        snprintf(spdBuf, sizeof(spdBuf), "%d", displaySpeed);
+        printCentered(spdBuf, 20, 3);
+
+        // Limit Info Subtitle
+        char limBuf[24];
+        snprintf(limBuf, sizeof(limBuf), "LIMIT: %d KM/H", (int)speedLimit);
+        printCentered(limBuf, 48, 1);
+
+        display.drawFastHLine(0, 60, SCREEN_WIDTH, SSD1306_WHITE);
+        display.display();
+        return;
+    }
+
+    // Normal Display -> Invert off
+    display.invertDisplay(false);
+
     char dateStr[14], timeStr[10];
     if (dateTimeValid) {
         snprintf(dateStr, sizeof(dateStr), "%d %s", wibDay, MONTH_NAMES[wibMonth - 1]);
@@ -392,6 +418,58 @@ void updateOLED() {
         snprintf(dateStr, sizeof(dateStr), "-- ---");
         snprintf(timeStr, sizeof(timeStr), "--:--");
     }
+
+    // ============================================================
+    // MODE 1: JAM DIGITAL FULL LAYAR (FULL SCREEN CLOCK)
+    // ============================================================
+    if (oledDisplayMode == 1) {
+        // Top Bar: Tanggal Lengkap & Status Network (y = 0..9)
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        if (dateTimeValid) {
+            char fullDate[18];
+            snprintf(fullDate, sizeof(fullDate), "%d %s %d", wibDay, MONTH_NAMES[wibMonth - 1], wibYear);
+            display.print(fullDate);
+        } else {
+            display.print("JAM DIGITAL");
+        }
+
+        if (wifiState == WIFI_CONNECTED) {
+            display.setCursor(SCREEN_WIDTH - 24, 0);
+            display.print("WIB");
+        } else {
+            display.setCursor(SCREEN_WIDTH - 36, 0);
+            display.print("NO NET");
+        }
+        display.drawFastHLine(0, 10, SCREEN_WIDTH, SSD1306_WHITE);
+
+        // Big Fullscreen Clock Center (y = 16..46)
+        printCentered(timeStr, 16, 4);
+
+        // Footer Bar (y = 52..63): Mini Speed & ODO
+        display.drawFastHLine(0, 52, SCREEN_WIDTH, SSD1306_WHITE);
+        display.setTextSize(1);
+        char miniSpeed[18], miniOdo[18];
+        int spd = (currentSpeed >= 2.0) ? (int)(currentSpeed + 0.5) : 0;
+        snprintf(miniSpeed, sizeof(miniSpeed), "%d KM/H", spd);
+        snprintf(miniOdo, sizeof(miniOdo), "ODO %ld", (long)(odoKm + 0.5));
+
+        display.setCursor(0, 55);
+        display.print(miniSpeed);
+
+        int16_t x1, y1; uint16_t w, h;
+        display.getTextBounds(miniOdo, 0, 0, &x1, &y1, &w, &h);
+        display.setCursor(SCREEN_WIDTH - w, 55);
+        display.print(miniOdo);
+
+        display.display();
+        return;
+    }
+
+    // ============================================================
+    // MODE 0: DASHBOARD SPEEDOMETER HUD (MODE BIASA)
+    // ============================================================
+    display.setTextSize(1);
 
     // Tanggal di Kiri
     display.setCursor(0, 0);
@@ -421,25 +499,19 @@ void updateOLED() {
     // Garis pemisah header
     display.drawFastHLine(0, 9, SCREEN_WIDTH, SSD1306_WHITE);
 
-    // ----------------------------------------------------
     // SPEEDOMETER TENGAH (y = 13 s/d 48)
-    // ----------------------------------------------------
-    if (!(overSpeedActive && !blinkState)) {
-        char speedStr[6];
-        if (gpsFix) {
-            int displaySpeed = (currentSpeed >= 2.0) ? (int)(currentSpeed + 0.5) : 0;
-            snprintf(speedStr, sizeof(speedStr), "%d", displaySpeed);
-        } else {
-            snprintf(speedStr, sizeof(speedStr), "--");
-        }
-        printCentered(speedStr, 13, 4);
+    char speedStr[6];
+    if (gpsFix) {
+        int displaySpeed = (currentSpeed >= 2.0) ? (int)(currentSpeed + 0.5) : 0;
+        snprintf(speedStr, sizeof(speedStr), "%d", displaySpeed);
+    } else {
+        snprintf(speedStr, sizeof(speedStr), "--");
     }
+    printCentered(speedStr, 13, 4);
 
-    // Sub-title / Status Satelit / Warning
+    // Sub-title / Status Satelit / Flash Test
     if (flashTestActive) {
         printCentered("[ FLASH TEST ]", 44, 1);
-    } else if (overSpeedActive) {
-        printCentered("! SPEED WARNING !", 44, 1);
     } else if (gpsFix) {
         char satStr[24];
         snprintf(satStr, sizeof(satStr), "KM/H  SAT: %d", gps.satellites.value());
@@ -451,9 +523,7 @@ void updateOLED() {
     // Garis pemisah footer
     display.drawFastHLine(0, 53, SCREEN_WIDTH, SSD1306_WHITE);
 
-    // ----------------------------------------------------
     // BARIS FOOTER (y = 55 s/d 63) - ODO & TRIP
-    // ----------------------------------------------------
     char odoStr[20], tripStr[20];
     snprintf(odoStr, sizeof(odoStr), "ODO %ld", (long)(odoKm + 0.5));
     if (tripKm < 10.0) {
@@ -638,6 +708,27 @@ void syncCommandsFromWeb() {
             clearHttp.addHeader("Content-Type", "application/json");
             clearHttp.PUT("{\"active\":false,\"timestamp\":0}");
             clearHttp.end();
+        }
+    }
+    http.end();
+
+    // 5. Sync OLED Display Mode (0 = Speedo HUD, 1 = Full Clock)
+    String dispModeUrl = String(FIREBASE_HOST) + "/settings/displayMode.json";
+    http.begin(firebaseClient, dispModeUrl);
+    http.setReuse(true);
+    http.setTimeout(800);
+
+    httpCode = http.GET();
+    if (httpCode == 200) {
+        String payload = http.getString();
+        int modeVal = payload.toInt();
+        if (modeVal == 0 || modeVal == 1) {
+            if (modeVal != oledDisplayMode) {
+                portENTER_CRITICAL(&dataMux);
+                oledDisplayMode = modeVal;
+                portEXIT_CRITICAL(&dataMux);
+                Serial.printf("[WEB] Mode Layar OLED diubah: %s\n", (oledDisplayMode == 1) ? "JAM FULL LAYAR" : "SPEEDO HUD");
+            }
         }
     }
     http.end();

@@ -11,6 +11,7 @@ const FIREBASE_DB_URL = 'https://vehicle-monitor-esp32-default-rtdb.asia-southea
 const STORAGE_SPEED_LIMIT = 'vehicle_scada_speed_limit';
 const STORAGE_SERVICE_HISTORY = 'vehicle_scada_service_history';
 const STORAGE_MAINTENANCE_SETTINGS = 'vehicle_scada_maintenance_settings';
+const STORAGE_DISPLAY_MODE = 'vehicle_oled_display_mode';
 
 // Pub/Sub Listeners Registry
 const listeners = {
@@ -20,7 +21,8 @@ const listeners = {
   maintenance: [],
   history: [],
   connection: [],
-  flashTest: []
+  flashTest: [],
+  displayMode: []
 };
 
 let eventSource = null;
@@ -254,6 +256,54 @@ export function subscribeConnectionStatus(callback) {
 
 export function subscribeFlashTest(callback) {
   listeners.flashTest.push(callback);
+}
+
+export function subscribeDisplayMode(callback) {
+  listeners.displayMode.push(callback);
+  try {
+    const saved = localStorage.getItem(STORAGE_DISPLAY_MODE);
+    if (saved !== null) callback(Number(saved));
+  } catch (e) {}
+}
+
+/**
+ * Change OLED Display Mode (0 = Speedometer Dashboard HUD, 1 = Fullscreen Clock)
+ */
+export async function writeDisplayMode(modeVal = 0) {
+  const mode = Number(modeVal) === 1 ? 1 : 0;
+  try {
+    localStorage.setItem(STORAGE_DISPLAY_MODE, mode.toString());
+  } catch (e) {}
+
+  dispatchLocalUpdate('displayMode', mode);
+
+  // Background non-blocking sync to Firebase Realtime Database
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  const payload = {
+    mode,
+    name: mode === 1 ? 'FULL_CLOCK' : 'SPEEDO_HUD',
+    timestamp: Date.now()
+  };
+
+  fetch(`${FIREBASE_DB_URL}/commands/displayMode.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal: controller.signal
+  }).catch(() => {});
+
+  fetch(`${FIREBASE_DB_URL}/settings/displayMode.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mode),
+    signal: controller.signal
+  })
+    .catch(err => console.warn('[Firebase] Background displayMode sync:', err.message))
+    .finally(() => clearTimeout(timeoutId));
+
+  return { success: true, mode };
 }
 
 /**
