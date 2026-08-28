@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vehicle-monitor-v20260828_ultra_v7';
+const CACHE_NAME = 'vehicle-monitor-v20260828_ultra_v8';
 
 // Install: Pre-cache static shell & skip waiting immediately
 self.addEventListener('install', (event) => {

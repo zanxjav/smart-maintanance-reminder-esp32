@@ -434,7 +434,7 @@
         </div>
 
         <!-- Speed Limit Banner -->
-        <div class="speed-limit-banner" id="btnOpenSpeedLimit">
+        <div class="speed-limit-banner" id="btnOpenSpeedLimit" onclick="openSpeedLimitModal()" style="cursor: pointer;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="16" x2="12" y2="12"/>
@@ -462,7 +462,7 @@
               <span class="flash-desc-text" id="flashDescText">Uji kedipan lampu indikator warning (Pin 4)</span>
             </div>
           </div>
-          <button type="button" class="btn-trigger-flash" id="btnFlashTest" aria-label="Mulai Flash Test Lampu Oren">
+          <button type="button" class="btn-trigger-flash" id="btnFlashTest" onclick="toggleFlashTest()" aria-label="Mulai Flash Test Lampu Oren">
             <span class="btn-trigger-icon" id="btnFlashIcon">⚡</span>
             <span class="btn-trigger-label" id="btnFlashLabel">Test Flash</span>
           </button>
@@ -927,6 +927,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="./js/app.js?v=20260828_ultra_v7"></script>
+  <script src="./js/app.js?v=20260828_ultra_v8"></script>
 </body>
 </html>
