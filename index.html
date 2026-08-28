@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./css/style.css?v=20260828_ultra_v7">
+  <link rel="stylesheet" href="./css/style.css?v=20260828_ultra_v9">
   <style>
     /* Critical Inline CSS for Zero Cache Failure & Instant Visual Rendering */
     .oled-mode-card {
@@ -185,18 +185,81 @@
       top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
       width: 100vw !important;
       height: 100vh !important;
-      background: rgba(0, 0, 0, 0.82) !important;
+      background: rgba(0, 0, 0, 0.85) !important;
       backdrop-filter: blur(10px) !important;
       -webkit-backdrop-filter: blur(10px) !important;
       z-index: 9999 !important;
       align-items: center !important;
       justify-content: center !important;
-      padding: 1rem !important;
+      padding: 0.75rem !important;
       pointer-events: none !important;
     }
     .modal-backdrop.open {
       display: flex !important;
       pointer-events: auto !important;
+    }
+    .modal-card {
+      background: #131b2e !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      border-radius: 18px !important;
+      width: 100% !important;
+      max-width: 500px !important;
+      max-height: 88vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75) !important;
+    }
+    .modal-card form {
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1 !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    .modal-header {
+      padding: 1.1rem 1.3rem !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      flex-shrink: 0 !important;
+    }
+    .modal-body {
+      padding: 1.2rem 1.3rem !important;
+      overflow-y: auto !important;
+      flex: 1 !important;
+      min-height: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 0.9rem !important;
+      -webkit-overflow-scrolling: touch !important;
+    }
+    .modal-footer {
+      padding: 0.85rem 1.3rem !important;
+      border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+      background: #0d1424 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      gap: 0.65rem !important;
+      flex-shrink: 0 !important;
+    }
+    .preset-row {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      gap: 0.35rem !important;
+      align-items: center !important;
+      width: 100% !important;
+    }
+    .btn-pre {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0.35rem 0.65rem !important;
+      font-size: 0.75rem !important;
+      white-space: nowrap !important;
     }
   </style>
 </head>
@@ -642,8 +705,8 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-pri">Simpan Limit</button>
+          <button type="button" class="btn-sec modal-close-trigger" onclick="closeAllModals()">Batal</button>
+          <button type="submit" class="btn-pri" style="padding: 0.65rem 1.4rem; font-weight: 800;">💾 Simpan Limit (SAVE)</button>
         </div>
       </form>
     </div>
@@ -787,11 +850,19 @@
             </div>
           </div>
 
+          <!-- Tombol Simpan Utama di Form Body (Always Visible on Mobile) -->
+          <div style="margin-top: 0.65rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.08);">
+            <button type="submit" class="btn-pri" style="width: 100%; padding: 0.85rem 1rem; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4); border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>SIMPAN KOMPONEN (SAVE)</span>
+            </button>
+          </div>
+
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-pri" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">+ Simpan Komponen</button>
+          <button type="button" class="btn-sec modal-close-trigger" onclick="closeAllModals()">Batal</button>
+          <button type="submit" class="btn-pri" style="padding: 0.65rem 1.4rem; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">✓ Simpan Komponen (SAVE)</button>
         </div>
       </form>
     </div>
@@ -836,8 +907,8 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-pri">Simpan Servis</button>
+          <button type="button" class="btn-sec modal-close-trigger" onclick="closeAllModals()">Batal</button>
+          <button type="submit" class="btn-pri" style="padding: 0.65rem 1.4rem; font-weight: 800;">💾 Simpan Servis (SAVE)</button>
         </div>
       </form>
     </div>
@@ -884,8 +955,8 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
-          <button type="submit" class="btn-pri">Simpan Interval</button>
+          <button type="button" class="btn-sec modal-close-trigger" onclick="closeAllModals()">Batal</button>
+          <button type="submit" class="btn-pri" style="padding: 0.65rem 1.4rem; font-weight: 800;">💾 Simpan Interval (SAVE)</button>
         </div>
       </form>
     </div>
@@ -927,6 +998,6 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="./js/app.js?v=20260828_ultra_v8"></script>
+  <script src="./js/app.js?v=20260828_ultra_v9"></script>
 </body>
 </html>
