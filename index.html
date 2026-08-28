@@ -6,19 +6,7 @@
   <title>Vehicle Monitor - Dashboard</title>
   <meta name="description" content="Vehicle Monitor dashboard with real-time overview, trip meter, speed limiter, and maintenance reminders.">
 
-  <!-- Force Clear Mobile Cache & SW Script -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        for(let r of regs) r.unregister();
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let n of names) caches.delete(n);
-      });
-    }
-  </script>
+  <!-- Cache Control (Always Serve Fresh UI) -->
 
   <!-- Cache Control (Always Serve Fresh UI to Phones) -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -40,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="./css/style.css?v=20260827_zero_overlap">
+  <link rel="stylesheet" href="./css/style.css?v=20260828_add_maint_smooth">
 </head>
 <body>
 
@@ -120,7 +108,6 @@
           </div>
 
           <div class="box-bottom-wave">
-            <!-- Smooth Blue Wave -->
             <svg viewBox="0 0 160 28" fill="none">
               <path d="M 0,18 Q 20,8 40,18 T 80,18 T 120,8 T 160,18" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
             </svg>
@@ -147,7 +134,6 @@
           </div>
 
           <div class="box-bottom-wave">
-            <!-- Smooth Green Wave -->
             <svg viewBox="0 0 160 28" fill="none">
               <path d="M 0,16 Q 20,22 40,16 T 80,16 T 120,22 T 160,16" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"/>
             </svg>
@@ -175,7 +161,6 @@
           </div>
 
           <div class="box-bottom-wave">
-            <!-- Smooth Orange Wave -->
             <svg viewBox="0 0 160 28" fill="none">
               <path d="M 0,18 Q 30,24 60,18 T 120,18 T 160,14" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
             </svg>
@@ -198,7 +183,7 @@
           </div>
 
           <div class="box-bottom-status">
-            <div class="status-sub-text">All systems operational</div>
+            <div class="status-sub-text" id="statusSummarySubText">All systems operational</div>
           </div>
         </div>
 
@@ -315,109 +300,25 @@
       </section>
 
       <!-- ====================================================================
-           MAINTENANCE REMINDERS SECTION
+           MAINTENANCE REMINDERS SECTION (DYNAMIC 100% RESPONSIVE)
            ==================================================================== -->
       <section class="card-section maintenance-section">
         <div class="card-section-header">
-          <h3>Maintenance Reminders</h3>
-          <span class="section-view-all" id="btnViewAllMaintenance">View all</span>
+          <div class="m-section-title-group">
+            <h3>Maintenance Reminders</h3>
+            <span class="m-count-badge" id="mActiveCountBadge">0 Komponen</span>
+          </div>
+          <div class="m-header-actions">
+            <button type="button" class="btn-action-add" id="btnOpenAddMaintenanceQuick" aria-label="Tambah Maintenance">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>+ Add Maintenance</span>
+            </button>
+            <button type="button" class="section-view-all" id="btnViewAllMaintenance">Kelola</button>
+          </div>
         </div>
 
         <div class="maintenance-items-list" id="maintenanceListContainer">
-          
-          <!-- Item 1: Engine Oil -->
-          <div class="m-row-item" data-key="oil_engine">
-            <div class="m-card-top">
-              <div class="m-left-group">
-                <div class="m-icon-box green">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-                  </svg>
-                </div>
-                <div class="m-text-info">
-                  <span class="m-name" id="name-oil_engine">Engine Oil</span>
-                  <span class="m-sub" id="interval-oil_engine">Setiap 20,000 km</span>
-                </div>
-              </div>
-              <div class="m-right-group">
-                <span class="m-pct-pill" id="pct-oil_engine">0%</span>
-                <span class="m-arrow">›</span>
-              </div>
-            </div>
-
-            <div class="m-card-bottom">
-              <div class="m-progress-labels">
-                <span class="m-remaining-text" id="rem-oil_engine">20,000 km lagi</span>
-                <span class="m-status-tag normal" id="tag-oil_engine">Normal</span>
-              </div>
-              <div class="m-bar-track">
-                <div class="m-bar-fill green" id="bar-oil_engine" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Item 2: Transmission Fluid -->
-          <div class="m-row-item" data-key="transmission_oil">
-            <div class="m-card-top">
-              <div class="m-left-group">
-                <div class="m-icon-box orange">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-                  </svg>
-                </div>
-                <div class="m-text-info">
-                  <span class="m-name" id="name-transmission_oil">Transmission Fluid</span>
-                  <span class="m-sub" id="interval-transmission_oil">Setiap 40,000 km</span>
-                </div>
-              </div>
-              <div class="m-right-group">
-                <span class="m-pct-pill" id="pct-transmission_oil">0%</span>
-                <span class="m-arrow">›</span>
-              </div>
-            </div>
-
-            <div class="m-card-bottom">
-              <div class="m-progress-labels">
-                <span class="m-remaining-text" id="rem-transmission_oil">40,000 km lagi</span>
-                <span class="m-status-tag normal" id="tag-transmission_oil">Normal</span>
-              </div>
-              <div class="m-bar-track">
-                <div class="m-bar-fill orange" id="bar-transmission_oil" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Item 3: Radiator Coolant -->
-          <div class="m-row-item" data-key="coolant">
-            <div class="m-card-top">
-              <div class="m-left-group">
-                <div class="m-icon-box purple">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
-                  </svg>
-                </div>
-                <div class="m-text-info">
-                  <span class="m-name" id="name-coolant">Radiator Coolant</span>
-                  <span class="m-sub" id="interval-coolant">Setiap 40,000 km</span>
-                </div>
-              </div>
-              <div class="m-right-group">
-                <span class="m-pct-pill" id="pct-coolant">0%</span>
-                <span class="m-arrow">›</span>
-              </div>
-            </div>
-
-            <div class="m-card-bottom">
-              <div class="m-progress-labels">
-                <span class="m-remaining-text" id="rem-coolant">40,000 km lagi</span>
-                <span class="m-status-tag normal" id="tag-coolant">Normal</span>
-              </div>
-              <div class="m-bar-track">
-                <div class="m-bar-fill purple" id="bar-coolant" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
+          <!-- Dynamically populated via JS (Zero Lag) -->
         </div>
       </section>
 
@@ -530,23 +431,29 @@
   </div>
 
   <!-- ========================================================================
-       MODAL: MAINTENANCE MANAGER (SCHEDULES, INTERVAL SETTINGS, RECORD SERVICE)
+       MODAL: MAINTENANCE MANAGER (SCHEDULES, INTERVAL SETTINGS, RECORD SERVICE, DELETE)
        ======================================================================== -->
   <div class="modal-backdrop" id="modalMaintenanceManager">
     <div class="modal-card" style="max-width: 540px;">
       <div class="modal-header">
-        <h3>Manajemen Maintenance</h3>
+        <div>
+          <h3>Manajemen Maintenance</h3>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Pantau & atur seluruh siklus perawatan kendaraan</span>
+        </div>
         <button class="btn-close modal-close-trigger">✕</button>
       </div>
 
       <div class="modal-body" style="padding: 1.1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-          <h4 style="font-size: 0.95rem; font-weight: 700;">Daftar Jadwal Perawatan</h4>
-          <button class="btn-pri" id="btnOpenAddServiceForm" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">+ Catat Servis</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: #f8fafc;">Daftar Jadwal Perawatan</h4>
+          <div style="display: flex; gap: 0.45rem;">
+            <button type="button" class="btn-pri" id="btnOpenAddMaintenanceFromManager" style="padding: 0.42rem 0.85rem; font-size: 0.78rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">+ Add Maintenance</button>
+            <button type="button" class="btn-pri" id="btnOpenAddServiceForm" style="padding: 0.42rem 0.85rem; font-size: 0.78rem;">+ Catat Servis</button>
+          </div>
         </div>
 
         <div id="fullMaintenanceListContainer" style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <!-- Dynamically populated -->
+          <!-- Dynamically populated with Edit Interval, Log Service, and Delete buttons -->
         </div>
       </div>
 
@@ -557,26 +464,144 @@
   </div>
 
   <!-- ========================================================================
+       MODAL: ADD MAINTENANCE (TAMBAH PERAWATAN & KOMPONEN BARU)
+       ======================================================================== -->
+  <div class="modal-backdrop" id="modalAddMaintenance">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div>
+          <h3>+ Tambah Komponen Maintenance</h3>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Atur interval & komponen baru untuk dipantau otomatis</span>
+        </div>
+        <button class="btn-close modal-close-trigger">✕</button>
+      </div>
+
+      <form id="formAddMaintenance">
+        <div class="modal-body">
+          
+          <!-- Rekomendasi / Preset Cepat Komponen -->
+          <div class="form-group">
+            <label class="form-label">Pilih Cepat Komponen / Ketik Sendiri</label>
+            <div class="preset-chips-scroll" id="addPresetChipsList">
+              <button type="button" class="chip-preset-item" data-name="Engine Oil" data-cat="engine" data-km="10000" data-mo="6">Oli Mesin</button>
+              <button type="button" class="chip-preset-item" data-name="Oil Filter" data-cat="engine" data-km="10000" data-mo="6">Filter Oli</button>
+              <button type="button" class="chip-preset-item" data-name="Air Filter" data-cat="engine" data-km="20000" data-mo="12">Filter Udara</button>
+              <button type="button" class="chip-preset-item" data-name="Radiator Coolant" data-cat="cooling" data-km="40000" data-mo="12">Radiator Coolant</button>
+              <button type="button" class="chip-preset-item" data-name="Transmission Fluid" data-cat="transmission" data-km="40000" data-mo="24">Oli Transmisi</button>
+              <button type="button" class="chip-preset-item" data-name="Brake Fluid" data-cat="brakes" data-km="20000" data-mo="12">Minyak Rem</button>
+              <button type="button" class="chip-preset-item" data-name="Brake Pads" data-cat="brakes" data-km="30000" data-mo="18">Kampas Rem</button>
+              <button type="button" class="chip-preset-item" data-name="Spark Plugs" data-cat="engine" data-km="20000" data-mo="12">Busi</button>
+              <button type="button" class="chip-preset-item" data-name="V-Belt / Fanbelt" data-cat="engine" data-km="40000" data-mo="24">V-Belt / Fanbelt</button>
+              <button type="button" class="chip-preset-item" data-name="12V Battery" data-cat="electrical" data-km="50000" data-mo="24">Aki 12V</button>
+              <button type="button" class="chip-preset-item" data-name="Tire Rotation / Wear" data-cat="wheels" data-km="40000" data-mo="36">Rotasi / Ganti Ban</button>
+              <button type="button" class="chip-preset-item" data-name="Spooring & Balancing" data-cat="wheels" data-km="10000" data-mo="6">Spooring & Balancing</button>
+              <button type="button" class="chip-preset-item" data-name="Wiper Blade" data-cat="general" data-km="20000" data-mo="12">Karet Wiper</button>
+            </div>
+          </div>
+
+          <!-- Nama Komponen -->
+          <div class="form-group">
+            <label class="form-label" for="addMaintName">Nama Komponen / Perawatan <span style="color:#ef4444;">*</span></label>
+            <input type="text" id="addMaintName" class="form-input" required placeholder="Contoh: Oli Mesin, Kampas Rem, V-Belt, dll.">
+          </div>
+
+          <!-- Kategori -->
+          <div class="form-group">
+            <label class="form-label" for="addMaintCategory">Kategori Komponen</label>
+            <select id="addMaintCategory" class="form-input">
+              <option value="engine">⚙️ Mesin (Engine)</option>
+              <option value="transmission">🔄 Transmisi & Gardan</option>
+              <option value="brakes">🛑 Pengereman (Brakes)</option>
+              <option value="cooling">❄️ Pendingin (Cooling)</option>
+              <option value="electrical">⚡ Kelistrikan (Electrical)</option>
+              <option value="wheels">🛞 Roda & Ban (Wheels)</option>
+              <option value="general">🔧 Perawatan Umum (General)</option>
+            </select>
+          </div>
+
+          <!-- Interval KM & Bulan Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label" for="addMaintIntervalKm">Interval Jarak (KM) <span style="color:#ef4444;">*</span></label>
+              <input type="number" id="addMaintIntervalKm" class="form-input" required min="500" step="500" placeholder="10000" value="10000">
+              
+              <div class="preset-row" style="justify-content: flex-start; margin-top: 0.35rem; gap: 0.3rem;">
+                <button type="button" class="btn-pre btn-add-km-pre" data-val="5000">5k</button>
+                <button type="button" class="btn-pre btn-add-km-pre active" data-val="10000">10k</button>
+                <button type="button" class="btn-pre btn-add-km-pre" data-val="20000">20k</button>
+                <button type="button" class="btn-pre btn-add-km-pre" data-val="40000">40k</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="addMaintIntervalMonths">Interval Waktu (Bulan) <span style="color:#ef4444;">*</span></label>
+              <input type="number" id="addMaintIntervalMonths" class="form-input" required min="1" max="60" placeholder="6" value="6">
+              
+              <div class="preset-row" style="justify-content: flex-start; margin-top: 0.35rem; gap: 0.3rem;">
+                <button type="button" class="btn-pre btn-add-mo-pre" data-val="3">3 bln</button>
+                <button type="button" class="btn-pre btn-add-mo-pre active" data-val="6">6 bln</button>
+                <button type="button" class="btn-pre btn-add-mo-pre" data-val="12">12 bln</button>
+                <button type="button" class="btn-pre btn-add-mo-pre" data-val="24">24 bln</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Odometer & Tanggal Terakhir Servis -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div class="form-group">
+              <label class="form-label" for="addMaintLastOdo">Odometer Servis Terakhir (KM)</label>
+              <input type="number" id="addMaintLastOdo" class="form-input" required placeholder="Contoh: 97248" value="97248">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="addMaintLastDate">Tanggal Servis Terakhir</label>
+              <input type="date" id="addMaintLastDate" class="form-input" required>
+            </div>
+          </div>
+
+          <!-- Reminder Warning Threshold -->
+          <div class="form-group">
+            <label class="form-label" for="addMaintReminderKm">Beri Peringatan Kuning (Warning)</label>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <input type="number" id="addMaintReminderKm" class="form-input" style="flex: 1;" min="100" step="100" value="500">
+              <span style="font-size: 0.78rem; color: #94a3b8;">KM sebelum jatuh tempo</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-sec modal-close-trigger">Batal</button>
+          <button type="submit" class="btn-pri" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">+ Simpan Komponen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
        MODAL: INPUT CATAT SERVIS
        ======================================================================== -->
   <div class="modal-backdrop" id="modalAddService">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Catat Servis Selesai</h3>
+        <div>
+          <h3>Catat Servis Selesai</h3>
+          <span style="font-size: 0.76rem; color: #94a3b8;">Reset siklus kilometer & perbarui riwayat perawatan</span>
+        </div>
         <button class="btn-close modal-close-trigger">✕</button>
       </div>
 
       <form id="formAddService">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="serviceTypeSelect">Tipe Servis</label>
+            <label class="form-label" for="serviceTypeSelect">Pilih Komponen yang Diservis</label>
             <select id="serviceTypeSelect" class="form-input" required></select>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
             <div class="form-group">
               <label class="form-label" for="serviceOdoInput">Odometer Saat Servis</label>
-              <input type="number" id="serviceOdoInput" class="form-input" required placeholder="Contoh: 10000">
+              <input type="number" id="serviceOdoInput" class="form-input" required placeholder="Contoh: 97248">
             </div>
 
             <div class="form-group">
@@ -586,20 +611,8 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Item yang Diganti</label>
-            <div class="checkbox-wrap">
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Engine Oil"> Oli Mesin</label>
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Oil Filter"> Filter Oli</label>
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Air Filter"> Filter Udara</label>
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Radiator Coolant"> Coolant</label>
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Transmission Fluid"> Oli Transmisi</label>
-              <label class="cb-item"><input type="checkbox" class="part-cb" value="Brake Fluid"> Minyak Rem</label>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="serviceNotesInput">Catatan</label>
-            <textarea id="serviceNotesInput" class="form-input" rows="2" placeholder="Catatan mekanik..."></textarea>
+            <label class="form-label" for="serviceNotesInput">Catatan Tambahan / Bengkel (Opsional)</label>
+            <textarea id="serviceNotesInput" class="form-input" rows="2" placeholder="Contoh: Ganti oli Shell Helix HX8, bengkel resmi..."></textarea>
           </div>
         </div>
 
@@ -659,9 +672,42 @@
     </div>
   </div>
 
+  <!-- ========================================================================
+       MODAL: KONFIRMASI HAPUS KOMPONEN (SAFE & CRISP)
+       ======================================================================== -->
+  <div class="modal-backdrop" id="modalConfirmDelete">
+    <div class="modal-card" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 style="color: #ef4444; display: flex; align-items: center; gap: 0.4rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Hapus Komponen?
+        </h3>
+        <button class="btn-close modal-close-trigger">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
+          Apakah Anda yakin ingin menghapus komponen <strong id="deleteTargetName" style="color: #ffffff;"></strong> dari daftar pemantauan?
+        </p>
+        <p style="font-size: 0.78rem; color: #94a3b8; margin-top: 0.2rem;">
+          Data interval dan kalkulasi jadwal servis untuk komponen ini akan dihapus dari sistem.
+        </p>
+        <input type="hidden" id="deleteTargetKey">
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-sec modal-close-trigger">Batal</button>
+        <button type="button" class="btn-pri" id="btnConfirmDeleteAction" style="background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);">Ya, Hapus</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script type="module" src="./js/app.js?v=20260827_zero_overlap"></script>
+  <script type="module" src="./js/app.js?v=20260828_add_maint_smooth"></script>
 </body>
 </html>

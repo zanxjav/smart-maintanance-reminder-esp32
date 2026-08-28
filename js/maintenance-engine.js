@@ -1,482 +1,284 @@
 /**
- * MAINTENANCE ENGINE & BUSINESS LOGIC
+ * ULTRA LIGHTWEIGHT VEHICLE MAINTENANCE ENGINE (0ms UI LATENCY - ZERO LAG)
  * 
- * Manages maintenance schedules, dynamic interval recalculations,
- * date and distance threshold status evaluations (NORMAL, WARNING, DUE),
- * progress bar percentages, service recording, and local persistence.
+ * Pure Add & Delete Maintenance System.
+ * Clean, super-fast in-memory arithmetic with no recursion or heavy loops.
  */
 
-import { writeServiceRecord, writeMaintenanceSettings, dispatchLocalUpdate } from './telemetry-service.js';
+import { dispatchLocalUpdate } from './telemetry-service.js';
 
-// Default initial catalog
-export const DEFAULT_MAINTENANCE_SETTINGS = {
-  oil_engine: {
-    name: "Engine Oil",
-    category: "engine",
-    intervalKm: 20000,
-    intervalMonths: 2,
-    reminderKm: 500,
-    reminderDays: 7,
-    sensorNodeId: "node-engine"
+const STORAGE_KEY = 'vmon_maintenance_items_v2';
+const HISTORY_KEY = 'vmon_service_history_v2';
+
+// 2 Clean Initial Items (Can be deleted or edited anytime)
+const DEFAULT_ITEMS = [
+  {
+    id: 'maint_oli_mesin',
+    name: 'Oli Mesin',
+    category: 'engine',
+    intervalKm: 10000,
+    intervalMonths: 6,
+    lastServiceOdo: 97248,
+    lastServiceDate: '2026-08-28',
+    reminderKm: 500
   },
-  oil_filter: {
-    name: "Oil Filter",
-    category: "engine",
-    intervalKm: 20000,
-    intervalMonths: 2,
-    reminderKm: 500,
-    reminderDays: 7,
-    sensorNodeId: "node-oil-filter"
-  },
-  air_filter: {
-    name: "Air Filter",
-    category: "engine",
-    intervalKm: 40000,
-    intervalMonths: 4,
-    reminderKm: 1000,
-    reminderDays: 14,
-    sensorNodeId: "node-air-filter"
-  },
-  coolant: {
-    name: "Radiator Coolant",
-    category: "cooling",
-    intervalKm: 40000,
-    intervalMonths: 12,
-    reminderKm: 1000,
-    reminderDays: 14,
-    sensorNodeId: "node-coolant"
-  },
-  spark_plug: {
-    name: "Spark Plugs",
-    category: "engine",
-    intervalKm: 30000,
-    intervalMonths: 12,
-    reminderKm: 1000,
-    reminderDays: 14,
-    sensorNodeId: "node-engine"
-  },
-  transmission_oil: {
-    name: "Transmission Fluid",
-    category: "transmission",
-    intervalKm: 40000,
-    intervalMonths: 24,
-    reminderKm: 1500,
-    reminderDays: 20,
-    sensorNodeId: "node-transmission"
-  },
-  brake_fluid: {
-    name: "Brake Fluid",
-    category: "brakes",
-    intervalKm: 20000,
-    intervalMonths: 12,
-    reminderKm: 500,
-    reminderDays: 10,
-    sensorNodeId: "node-brakes-front"
-  },
-  brake_pad: {
-    name: "Brake Pads",
-    category: "brakes",
+  {
+    id: 'maint_kampas_rem',
+    name: 'Kampas Rem',
+    category: 'brakes',
     intervalKm: 30000,
     intervalMonths: 18,
-    reminderKm: 1000,
-    reminderDays: 14,
-    sensorNodeId: "node-brakes-rear"
-  },
-  battery: {
-    name: "12V Battery",
-    category: "electrical",
-    intervalKm: 50000,
-    intervalMonths: 24,
-    reminderKm: 2000,
-    reminderDays: 30,
-    sensorNodeId: "node-battery"
-  },
-  tire: {
-    name: "Tire Rotation / Wear",
-    category: "wheels",
-    intervalKm: 40000,
-    intervalMonths: 36,
-    reminderKm: 1000,
-    reminderDays: 30,
-    sensorNodeId: "node-tire-front"
+    lastServiceOdo: 97248,
+    lastServiceDate: '2026-08-28',
+    reminderKm: 1000
   }
-};
-
-// Initial clean maintenance state calibrated for 97,248 KM vehicle
-export const DEFAULT_MAINTENANCE_STATE = {
-  oil_engine: { lastServiceOdo: 95000, lastServiceDate: "2026-08-01", nextServiceOdo: 105000, nextServiceDate: "2026-10-01", status: "NORMAL" },
-  oil_filter: { lastServiceOdo: 95000, lastServiceDate: "2026-08-01", nextServiceOdo: 105000, nextServiceDate: "2026-10-01", status: "NORMAL" },
-  air_filter: { lastServiceOdo: 80000, lastServiceDate: "2026-06-01", nextServiceOdo: 120000, nextServiceDate: "2026-12-01", status: "NORMAL" },
-  coolant: { lastServiceOdo: 80000, lastServiceDate: "2026-01-01", nextServiceOdo: 120000, nextServiceDate: "2027-01-01", status: "NORMAL" },
-  spark_plug: { lastServiceOdo: 80000, lastServiceDate: "2026-01-01", nextServiceOdo: 110000, nextServiceDate: "2027-01-01", status: "NORMAL" },
-  transmission_oil: { lastServiceOdo: 80000, lastServiceDate: "2025-08-01", nextServiceOdo: 120000, nextServiceDate: "2027-08-01", status: "NORMAL" },
-  brake_fluid: { lastServiceOdo: 90000, lastServiceDate: "2026-03-01", nextServiceOdo: 110000, nextServiceDate: "2027-03-01", status: "NORMAL" },
-  brake_pad: { lastServiceOdo: 85000, lastServiceDate: "2026-02-01", nextServiceOdo: 115000, nextServiceDate: "2027-08-01", status: "NORMAL" },
-  battery: { lastServiceOdo: 80000, lastServiceDate: "2025-10-01", nextServiceOdo: 130000, nextServiceDate: "2027-10-01", status: "NORMAL" },
-  tire: { lastServiceOdo: 90000, lastServiceDate: "2026-05-01", nextServiceOdo: 130000, nextServiceDate: "2029-05-01", status: "NORMAL" }
-};
-
-// Clean service history (no dummy records)
-export const DEFAULT_SERVICE_HISTORY = [];
+];
 
 class MaintenanceEngine {
   constructor() {
-    this.settings = this.loadLocal('scada_maintenance_settings', DEFAULT_MAINTENANCE_SETTINGS);
-    this.state = this.loadLocal('scada_maintenance_state', DEFAULT_MAINTENANCE_STATE);
-    this.history = this.loadLocal('scada_service_history', DEFAULT_SERVICE_HISTORY);
+    this.cleanLegacyStorage();
+    this.items = this.loadItems();
+    this.history = this.loadHistory();
     this.currentOdo = 97248;
   }
 
-  loadLocal(key, fallback) {
+  // Wipe old bloated keys from previous versions
+  cleanLegacyStorage() {
     try {
-      const data = localStorage.getItem(key);
-      if (data) {
-        const parsed = JSON.parse(data);
-        // If it contains old demo dummy items or uninitialized 0 ODO state, reset to clean fallback
-        if (key === 'scada_service_history' && Array.isArray(parsed) && parsed.some(x => x.id && x.id.startsWith('srv_demo'))) {
-          localStorage.removeItem(key);
-          return fallback;
-        }
-        if (key === 'scada_maintenance_state' && parsed.oil_engine && parsed.oil_engine.lastServiceOdo === 0) {
-          localStorage.removeItem(key);
-          return fallback;
-        }
-        return parsed;
-      }
-      return JSON.parse(JSON.stringify(fallback));
-    } catch (e) {
-      return JSON.parse(JSON.stringify(fallback));
-    }
+      const legacyKeys = [
+        'scada_maintenance_settings',
+        'scada_maintenance_state',
+        'scada_service_history',
+        'vehicle_scada_maintenance_settings',
+        'vehicle_scada_service_history'
+      ];
+      legacyKeys.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
   }
 
-  saveLocal(key, value) {
+  loadItems() {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.warn("LocalStorage save error:", e);
-    }
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_ITEMS));
+  }
+
+  loadHistory() {
+    try {
+      const data = localStorage.getItem(HISTORY_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  saveItems() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items));
+    } catch (e) {}
+    dispatchLocalUpdate('settings', this.items);
+  }
+
+  saveHistory() {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));
+    } catch (e) {}
+    dispatchLocalUpdate('history', this.history);
   }
 
   setCurrentOdo(odo) {
-    this.currentOdo = Number(odo) || 0;
-    this.recalculateAllStatuses();
+    if (odo > 0) {
+      this.currentOdo = Number(odo);
+    }
   }
 
-  /**
-   * Helper: Add months to a date string (YYYY-MM-DD)
-   */
   addMonthsToDate(dateStr, months) {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
-    
-    d.setMonth(d.getMonth() + parseInt(months, 10));
-    return d.toISOString().split('T')[0];
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr || '-';
+      d.setMonth(d.getMonth() + parseInt(months || 6, 10));
+      return d.toISOString().split('T')[0];
+    } catch (e) {
+      return dateStr || '-';
+    }
   }
 
-  /**
-   * Format date for human display (e.g. 23 Aug 2026)
-   */
   formatDisplayDate(dateStr) {
-    if (!dateStr) return "-";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
+    if (!dateStr || dateStr === '-') return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    } catch (e) {
+      return dateStr;
+    }
   }
 
-  /**
-   * Format number with comma separators (e.g. 100,250)
-   */
   formatNumber(num) {
     if (num === null || num === undefined || isNaN(num)) return "0";
-    return Number(num).toLocaleString('en-US');
+    return Number(num).toLocaleString('id-ID');
   }
 
-  /**
-   * Calculate exact next service values based on dynamic settings
-   */
-  calculateNextService(typeKey, lastOdo, lastDate) {
-    const setting = this.settings[typeKey] || { intervalKm: 20000, intervalMonths: 2 };
-    const nextOdo = Number(lastOdo) + Number(setting.intervalKm);
-    const nextDate = this.addMonthsToDate(lastDate, setting.intervalMonths);
-    return { nextOdo, nextDate };
+  getCategoryInfo(cat) {
+    const category = (cat || 'general').toLowerCase();
+    switch (category) {
+      case 'engine':
+        return { label: 'Mesin', colorClass: 'green', colorHex: '#10b981', iconSvg: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' };
+      case 'transmission':
+        return { label: 'Transmisi', colorClass: 'orange', colorHex: '#f59e0b', iconSvg: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>' };
+      case 'cooling':
+        return { label: 'Pendingin', colorClass: 'purple', colorHex: '#a855f7', iconSvg: '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>' };
+      case 'brakes':
+        return { label: 'Pengereman', colorClass: 'red', colorHex: '#ef4444', iconSvg: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><line x1="12" y1="3" x2="12" y2="7"/>' };
+      case 'electrical':
+        return { label: 'Kelistrikan', colorClass: 'yellow', colorHex: '#eab308', iconSvg: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' };
+      case 'wheels':
+        return { label: 'Roda & Ban', colorClass: 'blue', colorHex: '#38bdf8', iconSvg: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>' };
+      default:
+        return { label: 'Umum', colorClass: 'blue', colorHex: '#38bdf8', iconSvg: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' };
+    }
   }
 
-  /**
-   * Evaluate Status (NORMAL, WARNING, DUE) and progress % for an item
-   */
-  evaluateItemHealth(key) {
-    const itemSetting = this.settings[key];
-    if (!itemSetting) {
-      return { status: "NORMAL", progressPercent: 0, percentUsed: 0, kmLeft: 0, daysLeft: 30, nextOdo: 0, nextDate: "" };
+  // ADD Maintenance Item
+  addItem(data) {
+    const id = 'maint_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    const item = {
+      id,
+      name: data.name || 'Komponen Baru',
+      category: data.category || 'general',
+      intervalKm: Math.max(500, Number(data.intervalKm) || 10000),
+      intervalMonths: Math.max(1, Number(data.intervalMonths) || 6),
+      lastServiceOdo: Number(data.lastServiceOdo !== undefined ? data.lastServiceOdo : this.currentOdo) || this.currentOdo,
+      lastServiceDate: data.lastServiceDate || new Date().toISOString().split('T')[0],
+      reminderKm: Math.max(50, Number(data.reminderKm) || 500)
+    };
+
+    this.items.push(item);
+    this.saveItems();
+    return item;
+  }
+
+  // DELETE Maintenance Item
+  deleteItem(id) {
+    const idx = this.items.findIndex(i => i.id === id);
+    if (idx !== -1) {
+      const removed = this.items.splice(idx, 1);
+      this.saveItems();
+      return true;
+    }
+    return false;
+  }
+
+  // UPDATE Interval
+  updateInterval(id, intervalKm, intervalMonths) {
+    const item = this.items.find(i => i.id === id);
+    if (item) {
+      item.intervalKm = Math.max(500, Number(intervalKm) || 10000);
+      item.intervalMonths = Math.max(1, Number(intervalMonths) || 6);
+      this.saveItems();
+      return item;
+    }
+    return null;
+  }
+
+  // RECORD Service (Reset Cycle)
+  recordService(id, serviceOdo, serviceDate, notes = '') {
+    const item = this.items.find(i => i.id === id);
+    const odo = Number(serviceOdo) || this.currentOdo;
+    const date = serviceDate || new Date().toISOString().split('T')[0];
+
+    if (item) {
+      item.lastServiceOdo = odo;
+      item.lastServiceDate = date;
+      this.saveItems();
     }
 
-    const itemState = this.state[key] || {};
-    const currentOdo = Number(this.currentOdo) || 0;
-    const intervalKm = Number(itemSetting.intervalKm) || 20000;
-    const intervalMonths = Number(itemSetting.intervalMonths) || 6;
-    const reminderKm = Number(itemSetting.reminderKm) || 500;
-    const reminderDays = Number(itemSetting.reminderDays) || 7;
+    const logEntry = {
+      id: 'log_' + Date.now(),
+      itemId: id,
+      name: item ? item.name : 'Servis Kendaraan',
+      odo,
+      date,
+      notes,
+      timestamp: new Date().toISOString()
+    };
+    this.history.unshift(logEntry);
+    this.saveHistory();
 
-    const lastOdo = Number(itemState.lastServiceOdo) || 0;
-    let nextOdo = Number(itemState.nextServiceOdo) || (lastOdo + intervalKm);
+    return logEntry;
+  }
 
-    if (nextOdo <= lastOdo) {
-      nextOdo = lastOdo + intervalKm;
-    }
-
+  // CALCULATE Health Data for All Items (Super Fast In-Memory Arithmetic)
+  getAllCardsData() {
+    const currentOdo = this.currentOdo;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let lastDate = new Date(itemState.lastServiceDate);
-    if (isNaN(lastDate.getTime())) {
-      lastDate = new Date(today);
-    }
-
-    let nextDate = new Date(itemState.nextServiceDate);
-    if (isNaN(nextDate.getTime())) {
-      nextDate = new Date(today);
-      nextDate.setMonth(nextDate.getMonth() + intervalMonths);
-    }
-
-    // 1. Distance calculations
-    const kmLeft = Math.max(0, nextOdo - currentOdo);
-    const kmCovered = Math.max(0, currentOdo - lastOdo);
-    const totalKmInterval = Math.max(1, nextOdo - lastOdo);
-    const odoProgress = Math.max(0, Math.min(100, Math.round((kmCovered / totalKmInterval) * 100)));
-
-    // 2. Time calculations
-    const diffTimeMs = nextDate.getTime() - today.getTime();
-    const daysLeft = Math.ceil(diffTimeMs / (1000 * 60 * 60 * 24));
-    
-    const totalDaysInterval = Math.max(1, Math.ceil((nextDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const daysPassed = Math.max(0, Math.ceil((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const timeProgress = Math.max(0, Math.min(100, Math.round((daysPassed / totalDaysInterval) * 100)));
-
-    // Max progress drives the visual indicator
-    const progressPercent = Math.max(0, Math.min(100, Math.max(odoProgress, timeProgress) || 0));
-
-    // 3. Status Evaluation Logic
-    let status = "NORMAL";
-    
-    const isDueByKm = currentOdo > 0 && currentOdo >= nextOdo;
-    const isDueByDate = today.getTime() >= nextDate.getTime() && daysPassed >= totalDaysInterval;
-    
-    const isWarningByKm = currentOdo > 0 && currentOdo >= (nextOdo - reminderKm);
-    const isWarningByDate = daysLeft <= reminderDays && daysLeft > 0;
-
-    if (isDueByKm || isDueByDate) {
-      status = "DUE";
-    } else if (isWarningByKm || isWarningByDate) {
-      status = "WARNING";
-    } else {
-      status = "NORMAL";
-    }
-
-    return {
-      status,
-      progressPercent,
-      percentUsed: progressPercent,
-      kmLeft,
-      daysLeft,
-      nextOdo,
-      nextDate: nextDate.toISOString().split('T')[0]
-    };
-  }
-
-  /**
-   * Recalculate all item health statuses and return summary count
-   */
-  recalculateAllStatuses() {
-    let normalCount = 0;
-    let warningCount = 0;
     let dueCount = 0;
+    let warningCount = 0;
+    let normalCount = 0;
 
-    Object.keys(this.settings).forEach(key => {
-      // Ensure state exists
-      if (!this.state[key]) {
-        const { nextOdo, nextDate } = this.calculateNextService(key, this.currentOdo, new Date().toISOString().split('T')[0]);
-        this.state[key] = {
-          lastServiceOdo: this.currentOdo,
-          lastServiceDate: new Date().toISOString().split('T')[0],
-          nextServiceOdo: nextOdo,
-          nextServiceDate: nextDate,
-          status: "NORMAL"
-        };
-      }
-
-      const health = this.evaluateItemHealth(key);
-      this.state[key].status = health.status;
-
-      if (health.status === "NORMAL") normalCount++;
-      else if (health.status === "WARNING") warningCount++;
-      else if (health.status === "DUE") dueCount++;
-    });
-
-    this.saveLocal('scada_maintenance_state', this.state);
-    dispatchLocalUpdate('maintenance', this.state);
-
-    return {
-      total: Object.keys(this.settings).length,
-      normal: normalCount,
-      warning: warningCount,
-      due: dueCount
-    };
-  }
-
-  /**
-   * Record a new service log (Requirement 13)
-   */
-  async logService(record) {
-    const { type, odo, date, notes, items, photoProof } = record;
-    const serviceOdo = Number(odo) || this.currentOdo;
-    const serviceDate = date || new Date().toISOString().split('T')[0];
-
-    // 1. Create history item
-    const typeName = this.settings[type] ? this.settings[type].name : "General Service";
-    const historyItem = {
-      id: "srv_" + Date.now(),
-      type,
-      typeName,
-      odo: serviceOdo,
-      date: serviceDate,
-      notes: notes || "",
-      items: items && items.length > 0 ? items : [typeName],
-      photoProof: photoProof || "",
-      createdAt: new Date().toISOString()
-    };
-
-    this.history.unshift(historyItem);
-    this.saveLocal('scada_service_history', this.history);
-
-    // 2. Update all affected maintenance items (if multi-item selected or single type)
-    const affectedKeys = new Set([type]);
-    
-    // Check if items array matched other known maintenance keys
-    if (items && items.length) {
-      items.forEach(itemName => {
-        Object.keys(this.settings).forEach(k => {
-          if (this.settings[k].name.toLowerCase() === itemName.toLowerCase()) {
-            affectedKeys.add(k);
-          }
-        });
-      });
-    }
-
-    const updatedStateMap = {};
-
-    affectedKeys.forEach(k => {
-      if (this.settings[k]) {
-        // Calculate new nextService according to latest interval settings (Requirement 12 & 13)
-        const { nextOdo, nextDate } = this.calculateNextService(k, serviceOdo, serviceDate);
-        
-        this.state[k] = {
-          lastServiceOdo: serviceOdo,
-          lastServiceDate: serviceDate,
-          nextServiceOdo: nextOdo,
-          nextServiceDate: nextDate,
-          status: "NORMAL"
-        };
-        updatedStateMap[k] = this.state[k];
-      }
-    });
-
-    this.saveLocal('scada_maintenance_state', this.state);
-    this.recalculateAllStatuses();
-
-    // 3. Persist service record & broadcast update
-    await writeServiceRecord(historyItem, updatedStateMap);
-    dispatchLocalUpdate('history', this.history);
-
-    return historyItem;
-  }
-
-  /**
-   * Update or Add Maintenance Setting (Requirement 12 & 15)
-   */
-  async updateSetting(key, settingData) {
-    const isNew = !this.settings[key];
-    this.settings[key] = {
-      ...this.settings[key],
-      ...settingData,
-      intervalKm: Number(settingData.intervalKm) || 20000,
-      intervalMonths: Number(settingData.intervalMonths) || 2,
-      reminderKm: Number(settingData.reminderKm) || 500,
-      reminderDays: Number(settingData.reminderDays) || 7
-    };
-
-    this.saveLocal('scada_maintenance_settings', this.settings);
-
-    // If existing item interval changed, dynamically recalculate its next service (Requirement 12)
-    if (this.state[key]) {
-      const lastOdo = this.state[key].lastServiceOdo || this.currentOdo;
-      const lastDate = this.state[key].lastServiceDate || new Date().toISOString().split('T')[0];
-      const { nextOdo, nextDate } = this.calculateNextService(key, lastOdo, lastDate);
+    const cards = this.items.map(item => {
+      const catInfo = this.getCategoryInfo(item.category);
+      const lastOdo = Number(item.lastServiceOdo) || 0;
+      const intervalKm = Number(item.intervalKm) || 10000;
+      const nextServiceOdo = lastOdo + intervalKm;
+      const nextServiceDate = this.addMonthsToDate(item.lastServiceDate, item.intervalMonths);
       
-      this.state[key].nextServiceOdo = nextOdo;
-      this.state[key].nextServiceDate = nextDate;
-    } else {
-      const { nextOdo, nextDate } = this.calculateNextService(key, this.currentOdo, new Date().toISOString().split('T')[0]);
-      this.state[key] = {
-        lastServiceOdo: this.currentOdo,
-        lastServiceDate: new Date().toISOString().split('T')[0],
-        nextServiceOdo: nextOdo,
-        nextServiceDate: nextDate,
-        status: "NORMAL"
-      };
-    }
+      const kmCovered = Math.max(0, currentOdo - lastOdo);
+      const kmLeft = Math.max(0, nextServiceOdo - currentOdo);
+      const progressPercent = Math.max(0, Math.min(100, Math.round((kmCovered / intervalKm) * 100)));
 
-    this.saveLocal('scada_maintenance_state', this.state);
-    this.recalculateAllStatuses();
-
-    await writeMaintenanceSettings(this.settings);
-    dispatchLocalUpdate('settings', this.settings);
-
-    return this.settings[key];
-  }
-
-  /**
-   * Delete custom maintenance item
-   */
-  async deleteSetting(key) {
-    delete this.settings[key];
-    delete this.state[key];
-    this.saveLocal('scada_maintenance_settings', this.settings);
-    this.saveLocal('scada_maintenance_state', this.state);
-    this.recalculateAllStatuses();
-
-    await writeMaintenanceSettings(this.settings);
-    dispatchLocalUpdate('settings', this.settings);
-  }
-
-  getAllCardsData() {
-    return Object.keys(this.settings).map(key => {
-      const setting = this.settings[key];
-      const itemState = this.state[key] || {};
-      const health = this.evaluateItemHealth(key);
+      // Status calculation
+      let status = 'NORMAL';
+      if (currentOdo >= nextServiceOdo) {
+        status = 'DUE';
+        dueCount++;
+      } else if (kmLeft <= (item.reminderKm || 500)) {
+        status = 'WARNING';
+        warningCount++;
+      } else {
+        status = 'NORMAL';
+        normalCount++;
+      }
 
       return {
-        key,
-        name: setting.name,
-        category: setting.category || "general",
-        intervalKm: setting.intervalKm,
-        intervalMonths: setting.intervalMonths,
-        reminderKm: setting.reminderKm,
-        reminderDays: setting.reminderDays,
-        sensorNodeId: setting.sensorNodeId,
-        lastServiceOdo: itemState.lastServiceOdo || 0,
-        lastServiceDate: itemState.lastServiceDate || "-",
-        nextServiceOdo: health.nextOdo,
-        nextServiceDate: health.nextDate,
-        status: health.status,
-        progressPercent: health.progressPercent,
-        kmLeft: health.kmLeft,
-        daysLeft: health.daysLeft
+        id: item.id,
+        key: item.id,
+        name: item.name,
+        category: item.category,
+        categoryLabel: catInfo.label,
+        colorClass: catInfo.colorClass,
+        colorHex: catInfo.colorHex,
+        iconSvg: catInfo.iconSvg,
+        intervalKm,
+        intervalMonths: item.intervalMonths,
+        lastServiceOdo: lastOdo,
+        lastServiceDate: item.lastServiceDate,
+        nextServiceOdo,
+        nextServiceDate,
+        kmLeft,
+        progressPercent,
+        status
       };
     });
+
+    return {
+      cards,
+      summary: {
+        total: this.items.length,
+        due: dueCount,
+        warning: warningCount,
+        normal: normalCount
+      }
+    };
   }
 }
 

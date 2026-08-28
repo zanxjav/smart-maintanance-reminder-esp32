@@ -1,15 +1,13 @@
 /**
- * VEHICLE MONITOR - APP CONTROLLER (ULTRA SMOOTH 60FPS)
+ * VEHICLE MONITOR - ULTRA FAST APP CONTROLLER (ZERO LAG & 60FPS)
  * 
- * High-performance, lightweight orchestrator for the Vehicle Monitor Dashboard.
+ * Clean, lightweight orchestrator with instant Add & Delete Maintenance.
  */
 
 import { 
   initFirebaseRealtime,
   subscribeVehicleData, 
   subscribeSpeedLimit, 
-  subscribeMaintenanceStatus, 
-  subscribeServiceHistory, 
   subscribeConnectionStatus,
   subscribeFlashTest,
   writeSpeedLimit, 
@@ -25,24 +23,27 @@ let currentTrip = 0;
 let currentStatus = "Normal";
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Instant Synchronous UI Bootstrapping (Zero Lag)
+  // 1. Instant Bootstrap
   initClock();
   setupUIEvents();
   setupFlashTestController();
   setupSpeedLimiterModal();
+  setupAddMaintenanceModal();
   setupEditIntervalModal();
+  setupDeleteModal();
   setupConnectionModal();
   populateServiceModalDropdown();
+  
   maintenanceEngine.setCurrentOdo(currentOdo);
   renderMaintenanceReminders();
   updateRedlineArc(currentSpeedLimit);
   updateAnalogNeedle(0, currentSpeedLimit);
   handleVehicleDataUpdate({ speed: 0, rawSpeed: 0, odo: currentOdo, trip: currentTrip, status: currentStatus });
 
-  // 2. Start Realtime Hardware Telemetry (No Dummy Data)
+  // 2. Start Telemetry
   initFirebaseRealtime();
 
-  // 3. Telemetry Subscriptions
+  // 3. Subscriptions (Ultra clean, no recursion)
   subscribeVehicleData((data) => {
     handleVehicleDataUpdate(data);
   });
@@ -54,15 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  subscribeMaintenanceStatus(() => {
-    renderMaintenanceReminders();
-  });
-
-  subscribeServiceHistory(() => {
-    renderMaintenanceReminders();
-  });
-
-  // 4. Connection / Status Listener
   subscribeConnectionStatus((status) => {
     updateConnectionBadge(status.connected);
   });
@@ -76,7 +68,7 @@ function initClock() {
   const clockEl = document.getElementById('liveClockText');
   const update = () => {
     const now = new Date();
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
     const day = now.getDate();
     const month = months[now.getMonth()];
     const year = now.getFullYear();
@@ -91,7 +83,7 @@ function initClock() {
 }
 
 /* ==========================================================================
-   SUPER SMOOTH TELEMETRY UPDATES
+   SUPER SMOOTH TELEMETRY UPDATES (OPTIMIZED DOM WRITES)
    ========================================================================== */
 let lastDisplayedSpeed = -1;
 let lastDisplayedOdo = -1;
@@ -101,13 +93,12 @@ function handleVehicleDataUpdate(data) {
   if (!data) return;
 
   const rawSpd = Number(data.rawSpeed !== undefined ? data.rawSpeed : data.speed) || 0;
-  // Clean stationary deadband filter (anything under 2.5 km/h is treated strictly as 0)
   currentSpeed = rawSpd < 2.5 ? 0 : rawSpd;
   currentOdo = (Number(data.odo) > 0) ? Number(data.odo) : currentOdo;
   currentTrip = Number(data.trip) || currentTrip;
   currentStatus = data.status || currentStatus;
 
-  // Cached DOM writes for peak performance
+  // Cached DOM writes for speed
   const roundedSpeed = Math.round(currentSpeed);
   if (roundedSpeed !== lastDisplayedSpeed) {
     lastDisplayedSpeed = roundedSpeed;
@@ -116,10 +107,8 @@ function handleVehicleDataUpdate(data) {
     if (speedValEl) speedValEl.textContent = roundedSpeed;
     if (speedLargeEl) speedLargeEl.textContent = roundedSpeed;
 
-    // Update Sport Analog Needle & Dial Alert
     updateAnalogNeedle(currentSpeed, currentSpeedLimit);
 
-    // Over-speed alert notification
     const actDot = document.getElementById('recentActivityDot');
     const actTitle = document.getElementById('recentActivityTitle');
     const actSub = document.getElementById('recentActivitySub');
@@ -133,14 +122,18 @@ function handleVehicleDataUpdate(data) {
     }
   }
 
+  // Cached DOM writes for ODO
   const roundedOdo = Math.round(currentOdo);
   if (roundedOdo !== lastDisplayedOdo && roundedOdo > 0) {
     lastDisplayedOdo = roundedOdo;
     const odoEl = document.getElementById('valOdo');
     if (odoEl) odoEl.textContent = maintenanceEngine.formatNumber(roundedOdo);
     maintenanceEngine.setCurrentOdo(roundedOdo);
+    // Instant lightweight render on ODO changes
+    renderMaintenanceReminders();
   }
 
+  // Cached DOM writes for Trip
   const tripNum = Number(currentTrip) || 0;
   const formattedTrip = tripNum < 10 ? tripNum.toFixed(2) : tripNum.toFixed(1);
   if (formattedTrip !== lastDisplayedTrip) {
@@ -151,7 +144,7 @@ function handleVehicleDataUpdate(data) {
 }
 
 /**
- * Dynamic 2D Redline Arc based on configured Speed Limit (Scale 0 to 140 km/h in 180° semi-circle)
+ * Dynamic 2D Redline Arc based on configured Speed Limit
  */
 export function updateRedlineArc(speedLimitVal) {
   const maxScale = 140;
@@ -164,27 +157,25 @@ export function updateRedlineArc(speedLimitVal) {
   }
 
   if (redlineArc) {
-    // 180° semi-circle arc from left (180°) to right (0°)
     const startAngleDeg = 180 - (limit / maxScale) * 180;
     const startAngleRad = startAngleDeg * (Math.PI / 180);
 
     const cx = 140, cy = 100, r = 85;
     const x1 = cx + r * Math.cos(startAngleRad);
     const y1 = cy - r * Math.sin(startAngleRad);
-    const x2 = cx + r; // 225
-    const y2 = cy;     // 100
+    const x2 = cx + r;
+    const y2 = cy;
 
     redlineArc.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 0 1 ${x2} ${y2}`);
   }
 }
 
 /**
- * Update Flat 2D Needle rotation (-90° to +90°) & warning styling
+ * Update Flat 2D Needle rotation & warning styling
  */
 export function updateAnalogNeedle(speed, limit) {
   const maxScale = 140;
   const clampedSpeed = Math.min(maxScale, Math.max(0, speed));
-  // Needle rotation in 180° semi-circle: -90 deg (0 km/h) to +90 deg (140 km/h)
   const rotationDeg = -90 + (clampedSpeed / maxScale) * 180;
 
   const needleGroup = document.getElementById('analogNeedleGroup');
@@ -233,107 +224,208 @@ function updateSpeedLimitDisplay(limit) {
 }
 
 /* ==========================================================================
-   MAINTENANCE REMINDERS RENDERING
+   MAINTENANCE REMINDERS RENDERING (100% DYNAMIC & LIGHTWEIGHT)
    ========================================================================== */
 function renderMaintenanceReminders() {
-  const allCards = maintenanceEngine.getAllCardsData();
-  const summary = maintenanceEngine.recalculateAllStatuses();
+  const { cards, summary } = maintenanceEngine.getAllCardsData();
 
-  // 1. Status badge in header / 2x2 grid
+  // 1. Vehicle status badge in 2x2 grid
   const statusBadge = document.getElementById('valVehicleStatus');
+  const statusSub = document.getElementById('statusSummarySubText');
   if (statusBadge) {
     if (summary.due > 0) {
       statusBadge.textContent = 'Due Service';
       statusBadge.style.background = '#fef2f2';
       statusBadge.style.color = '#ef4444';
+      if (statusSub) statusSub.textContent = `${summary.due} komponen perlu diservis`;
     } else if (summary.warning > 0) {
       statusBadge.textContent = 'Warning';
       statusBadge.style.background = '#fffbeb';
       statusBadge.style.color = '#f59e0b';
+      if (statusSub) statusSub.textContent = `${summary.warning} komponen mendekati jadwal`;
     } else {
       statusBadge.textContent = 'Normal';
       statusBadge.style.background = '#ecfdf5';
       statusBadge.style.color = '#10b981';
+      if (statusSub) statusSub.textContent = 'All systems operational';
     }
   }
 
-  // 2. Dynamic Update of Dashboard Main Cards (Engine Oil, Transmission, Coolant)
-  const previewKeys = ['oil_engine', 'transmission_oil', 'coolant'];
-  previewKeys.forEach(key => {
-    const item = allCards.find(c => c.key === key);
-    if (!item) return;
+  // 2. Count badge in header
+  const countBadge = document.getElementById('mActiveCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${cards.length} Komponen`;
+  }
 
-    const nameEl = document.getElementById(`name-${key}`);
-    const intEl = document.getElementById(`interval-${key}`);
-    const remEl = document.getElementById(`rem-${key}`);
-    const barEl = document.getElementById(`bar-${key}`);
-    const pctEl = document.getElementById(`pct-${key}`);
-    const tagEl = document.getElementById(`tag-${key}`);
+  // 3. Dynamic Rendering of Dashboard Maintenance List
+  const dashContainer = document.getElementById('maintenanceListContainer');
+  if (dashContainer) {
+    if (cards.length === 0) {
+      dashContainer.innerHTML = `
+        <div style="text-align: center; padding: 2rem 1rem; color: #94a3b8; background: #131b2e; border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px;">
+          <p style="font-weight: 600; font-size: 0.9rem; color: #cbd5e1;">Belum ada komponen maintenance.</p>
+          <p style="font-size: 0.78rem; margin-top: 4px; color: #94a3b8;">Klik tombol "+ Add Maintenance" di atas untuk menambahkan.</p>
+        </div>
+      `;
+    } else {
+      dashContainer.innerHTML = cards.map(item => {
+        const pct = item.progressPercent;
+        const statusClass = item.status.toLowerCase();
+        const statusLabel = item.status === 'DUE' ? 'Due Service' : (item.status === 'WARNING' ? 'Warning' : 'Normal');
 
-    const pct = Math.max(0, Math.min(100, Math.round(Number(item.percentUsed !== undefined ? item.percentUsed : item.progressPercent) || 0)));
+        let barColor = '#10b981';
+        if (item.status === 'DUE') barColor = '#ef4444';
+        else if (item.status === 'WARNING') barColor = '#f59e0b';
 
-    if (nameEl) nameEl.textContent = item.name;
-    if (intEl) intEl.textContent = `Setiap ${maintenanceEngine.formatNumber(item.intervalKm)} km`;
-    if (remEl) {
-      remEl.textContent = item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} km lagi` : 'Jatuh tempo';
+        return `
+          <div class="m-row-item" data-id="${item.id}">
+            <div class="m-card-top">
+              <div class="m-left-group">
+                <div class="m-icon-box ${item.colorClass}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    ${item.iconSvg}
+                  </svg>
+                </div>
+                <div class="m-text-info">
+                  <div style="display: flex; align-items: center; gap: 0.4rem;">
+                    <span class="m-name">${item.name}</span>
+                    <span class="m-category-pill ${item.colorClass}">${item.categoryLabel}</span>
+                  </div>
+                  <span class="m-sub">Setiap ${maintenanceEngine.formatNumber(item.intervalKm)} km / ${item.intervalMonths} bln</span>
+                </div>
+              </div>
+              <div class="m-right-group">
+                <span class="m-pct-pill">${pct}%</span>
+                <span class="m-arrow">›</span>
+              </div>
+            </div>
+
+            <div class="m-card-bottom">
+              <div class="m-progress-labels">
+                <span class="m-remaining-text">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} km lagi` : 'Jatuh tempo!'}</span>
+                <span class="m-status-tag ${statusClass}">${statusLabel}</span>
+              </div>
+              <div class="m-bar-track">
+                <div class="m-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      dashContainer.querySelectorAll('.m-row-item').forEach(row => {
+        row.addEventListener('click', () => {
+          openServiceModal(row.dataset.id);
+        });
+      });
     }
-    if (pctEl) pctEl.textContent = `${pct}%`;
-    if (tagEl) {
-      tagEl.textContent = item.status === 'DUE' ? 'Due Service' : (item.status === 'WARNING' ? 'Warning' : 'Normal');
-      tagEl.className = `m-status-tag ${item.status.toLowerCase()}`;
-    }
-    if (barEl) {
-      barEl.style.width = `${pct}%`;
-      if (item.status === 'DUE') {
-        barEl.style.background = '#ef4444';
-      } else if (item.status === 'WARNING') {
-        barEl.style.background = '#f59e0b';
-      } else {
-        barEl.style.background = '#10b981';
-      }
-    }
-  });
+  }
 
-  // 3. Populate list in Full Maintenance Manager Modal
+  // 4. Dynamic Rendering in Full Maintenance Manager Modal
   const fullContainer = document.getElementById('fullMaintenanceListContainer');
   if (fullContainer) {
-    fullContainer.innerHTML = allCards.map(item => `
-      <div class="modal-service-card" data-key="${item.key}" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); padding: 1rem; border-radius: 14px; display: flex; flex-direction: column; gap: 0.75rem; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-          <div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: #ffffff;">${item.name}</div>
-            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 3px;">Interval: <strong style="color: #38bdf8;">${maintenanceEngine.formatNumber(item.intervalKm)} KM</strong> / <strong style="color: #38bdf8;">${item.intervalMonths} Bulan</strong></div>
-            <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 1px;">Berikutnya: ${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM (${item.nextServiceDate || '-'})</div>
-          </div>
-          <div style="text-align: right;">
-            <span style="font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 6px; background: ${item.status === 'DUE' ? 'rgba(239,68,68,0.18)' : (item.status === 'WARNING' ? 'rgba(245,158,11,0.18)' : 'rgba(16,185,129,0.18)')}; color: ${item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981')};">${item.status}</span>
-            <div style="font-size: 0.76rem; font-weight: 600; color: #cbd5e1; margin-top: 4px;">${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : 'Jatuh tempo'}</div>
-          </div>
+    if (cards.length === 0) {
+      fullContainer.innerHTML = `
+        <div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8; background: #1e293b; border: 1px dashed rgba(255,255,255,0.15); border-radius: 14px;">
+          <p style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">Daftar Perawatan Masih Kosong</p>
+          <p style="font-size: 0.8rem; margin: 6px 0 14px; color: #94a3b8;">Tambahkan komponen kendaraan untuk mulai memantau.</p>
+          <button type="button" class="btn-pri" id="btnEmptyAddMaint" style="padding: 0.5rem 1.1rem; font-size: 0.82rem; background: linear-gradient(135deg, #10b981, #059669);">+ Tambah Maintenance Sekarang</button>
         </div>
-
-        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.06);">
-          <button type="button" class="btn-sec btn-edit-interval-item" data-key="${item.key}" style="padding: 0.35rem 0.75rem; font-size: 0.76rem; border-radius: 8px;">⚙️ Ubah Interval</button>
-          <button type="button" class="btn-pri btn-log-service-item" data-key="${item.key}" style="padding: 0.35rem 0.85rem; font-size: 0.76rem; border-radius: 8px;">+ Catat Servis</button>
-        </div>
-      </div>
-    `).join('');
-
-    // Attach click triggers
-    fullContainer.querySelectorAll('.btn-edit-interval-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
+      `;
+      document.getElementById('btnEmptyAddMaint')?.addEventListener('click', () => {
         closeAllModals();
-        openEditIntervalModal(btn.dataset.key);
+        openAddMaintenanceModal();
       });
-    });
+    } else {
+      fullContainer.innerHTML = cards.map(item => {
+        const pct = item.progressPercent;
+        const statusLabel = item.status === 'DUE' ? 'DUE SERVICE' : (item.status === 'WARNING' ? 'WARNING' : 'NORMAL');
+        const statusBg = item.status === 'DUE' ? 'rgba(239,68,68,0.18)' : (item.status === 'WARNING' ? 'rgba(245,158,11,0.18)' : 'rgba(16,185,129,0.18)');
+        const statusColor = item.status === 'DUE' ? '#ef4444' : (item.status === 'WARNING' ? '#f59e0b' : '#10b981');
 
-    fullContainer.querySelectorAll('.btn-log-service-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeAllModals();
-        openServiceModal(btn.dataset.key);
+        let barColor = '#10b981';
+        if (item.status === 'DUE') barColor = '#ef4444';
+        else if (item.status === 'WARNING') barColor = '#f59e0b';
+
+        return `
+          <div class="modal-service-card" data-id="${item.id}" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); padding: 1rem 1.1rem; border-radius: 14px; display: flex; flex-direction: column; gap: 0.75rem; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div class="m-icon-box ${item.colorClass}" style="width: 36px; height: 36px; border-radius: 10px;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width: 18px; height: 18px;">
+                    ${item.iconSvg}
+                  </svg>
+                </div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <span style="font-weight: 700; font-size: 0.95rem; color: #ffffff;">${item.name}</span>
+                    <span class="m-category-pill ${item.colorClass}">${item.categoryLabel}</span>
+                  </div>
+                  <div style="font-size: 0.76rem; color: #94a3b8; margin-top: 3px;">
+                    Interval: <strong style="color: #38bdf8;">${maintenanceEngine.formatNumber(item.intervalKm)} KM</strong> / <strong style="color: #38bdf8;">${item.intervalMonths} Bulan</strong>
+                  </div>
+                  <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 1px;">
+                    Servis Berikutnya: <span style="color: #cbd5e1; font-weight: 600;">${maintenanceEngine.formatNumber(item.nextServiceOdo)} KM</span> (${maintenanceEngine.formatDisplayDate(item.nextServiceDate)})
+                  </div>
+                </div>
+              </div>
+              
+              <div style="text-align: right; flex-shrink: 0;">
+                <span style="font-weight: 700; font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 6px; background: ${statusBg}; color: ${statusColor};">${statusLabel}</span>
+                <div style="font-size: 0.76rem; font-weight: 700; color: #cbd5e1; margin-top: 4px;">
+                  ${item.kmLeft > 0 ? `${maintenanceEngine.formatNumber(item.kmLeft)} KM lagi` : '<span style="color:#ef4444;">Jatuh tempo!</span>'}
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #94a3b8;">
+                <span>Progres Pemakaian:</span>
+                <span style="font-weight: 700; color: ${statusColor};">${pct}%</span>
+              </div>
+              <div class="m-bar-track" style="height: 5px;">
+                <div class="m-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+              </div>
+            </div>
+
+            <!-- Action buttons: Edit Interval, Log Service, Delete -->
+            <div style="display: flex; gap: 0.45rem; justify-content: flex-end; align-items: center; padding-top: 0.45rem; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;">
+              <button type="button" class="btn-sec btn-edit-interval-item" data-id="${item.id}" style="padding: 0.35rem 0.7rem; font-size: 0.75rem; border-radius: 8px;">⚙️ Ubah Interval</button>
+              <button type="button" class="btn-pri btn-log-service-item" data-id="${item.id}" style="padding: 0.35rem 0.8rem; font-size: 0.75rem; border-radius: 8px;">+ Catat Servis</button>
+              <button type="button" class="btn-del-item" data-id="${item.id}" data-name="${item.name}" title="Hapus Komponen" aria-label="Hapus Komponen">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Hapus</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      fullContainer.querySelectorAll('.btn-edit-interval-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllModals();
+          openEditIntervalModal(btn.dataset.id);
+        });
       });
-    });
+
+      fullContainer.querySelectorAll('.btn-log-service-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllModals();
+          openServiceModal(btn.dataset.id);
+        });
+      });
+
+      fullContainer.querySelectorAll('.btn-del-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeAllModals();
+          openDeleteConfirmModal(btn.dataset.id, btn.dataset.name);
+        });
+      });
+    }
   }
 }
 
@@ -380,7 +472,7 @@ function setupSpeedLimiterModal() {
   });
 
   if (form) {
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       const newLimit = Number(slider.value);
       currentSpeedLimit = newLimit;
@@ -394,19 +486,162 @@ function setupSpeedLimiterModal() {
 }
 
 /* ==========================================================================
+   ADD MAINTENANCE MODAL CONTROLLER (SUPER FAST & INTUITIVE)
+   ========================================================================== */
+function openAddMaintenanceModal() {
+  const modal = document.getElementById('modalAddMaintenance');
+  if (!modal) return;
+
+  const odoInput = document.getElementById('addMaintLastOdo');
+  const dateInput = document.getElementById('addMaintLastDate');
+  const nameInput = document.getElementById('addMaintName');
+
+  if (odoInput) odoInput.value = Math.round(currentOdo);
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+  if (nameInput) nameInput.value = '';
+
+  document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
+
+  modal.classList.add('open');
+}
+
+function setupAddMaintenanceModal() {
+  const form = document.getElementById('formAddMaintenance');
+  const nameInput = document.getElementById('addMaintName');
+  const catSelect = document.getElementById('addMaintCategory');
+  const kmInput = document.getElementById('addMaintIntervalKm');
+  const moInput = document.getElementById('addMaintIntervalMonths');
+  const odoInput = document.getElementById('addMaintLastOdo');
+  const dateInput = document.getElementById('addMaintLastDate');
+  const reminderInput = document.getElementById('addMaintReminderKm');
+
+  // Preset chips
+  document.querySelectorAll('.chip-preset-item').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+
+      if (nameInput && chip.dataset.name) nameInput.value = chip.dataset.name;
+      if (catSelect && chip.dataset.cat) catSelect.value = chip.dataset.cat;
+      if (kmInput && chip.dataset.km) {
+        kmInput.value = chip.dataset.km;
+        document.querySelectorAll('.btn-add-km-pre').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === chip.dataset.km);
+        });
+      }
+      if (moInput && chip.dataset.mo) {
+        moInput.value = chip.dataset.mo;
+        document.querySelectorAll('.btn-add-mo-pre').forEach(b => {
+          b.classList.toggle('active', b.dataset.val === chip.dataset.mo);
+        });
+      }
+    });
+  });
+
+  // Preset buttons
+  document.querySelectorAll('.btn-add-km-pre').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (kmInput) kmInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-add-km-pre').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  document.querySelectorAll('.btn-add-mo-pre').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (moInput) moInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-add-mo-pre').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Form submit handler
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) {
+        showToast('Mohon masukkan nama komponen.', 'warning');
+        return;
+      }
+
+      const category = catSelect.value;
+      const intervalKm = Number(kmInput.value) || 10000;
+      const intervalMonths = Number(moInput.value) || 6;
+      const lastServiceOdo = Number(odoInput.value) || currentOdo;
+      const lastServiceDate = dateInput.value || new Date().toISOString().split('T')[0];
+      const reminderKm = Number(reminderInput.value) || 500;
+
+      closeAllModals();
+
+      maintenanceEngine.addItem({
+        name,
+        category,
+        intervalKm,
+        intervalMonths,
+        lastServiceOdo,
+        lastServiceDate,
+        reminderKm
+      });
+
+      populateServiceModalDropdown();
+      renderMaintenanceReminders();
+
+      showToast(`Komponen "${name}" berhasil ditambahkan!`, 'success');
+    });
+  }
+}
+
+/* ==========================================================================
+   DELETE MAINTENANCE ITEM CONTROLLER
+   ========================================================================== */
+function openDeleteConfirmModal(id, name) {
+  const modal = document.getElementById('modalConfirmDelete');
+  if (!modal) return;
+
+  const idInput = document.getElementById('deleteTargetKey');
+  const nameEl = document.getElementById('deleteTargetName');
+
+  if (idInput) idInput.value = id;
+  if (nameEl) nameEl.textContent = name;
+
+  modal.classList.add('open');
+}
+
+function setupDeleteModal() {
+  const confirmBtn = document.getElementById('btnConfirmDeleteAction');
+  if (!confirmBtn) return;
+
+  confirmBtn.addEventListener('click', () => {
+    const id = document.getElementById('deleteTargetKey')?.value;
+    if (!id) return;
+
+    const item = maintenanceEngine.items.find(i => i.id === id);
+    const itemName = item ? item.name : 'Komponen';
+
+    closeAllModals();
+
+    maintenanceEngine.deleteItem(id);
+
+    populateServiceModalDropdown();
+    renderMaintenanceReminders();
+
+    showToast(`"${itemName}" telah berhasil dihapus.`, 'info');
+  });
+}
+
+/* ==========================================================================
    UI EVENTS & BOTTOM TAB BAR (SUPER FLUID)
    ========================================================================== */
 function setupUIEvents() {
   // Bottom Tab Navigation
   const tabs = document.querySelectorAll('.nav-tab-item');
   tabs.forEach(tab => {
-    tab.addEventListener('click', async () => {
+    tab.addEventListener('click', () => {
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
 
       const tabName = tab.dataset.tab;
       if (tabName === 'trip') {
-        await writeResetTrip();
+        writeResetTrip();
         showToast('Trip meter berhasil direset ke 0.0 km', 'success');
         setTimeout(() => {
           document.getElementById('tabNavDashboard')?.classList.add('active');
@@ -420,16 +655,17 @@ function setupUIEvents() {
     });
   });
 
-  // Maintenance click triggers
-  document.getElementById('btnViewAllMaintenance')?.addEventListener('click', openMaintenanceManager);
-  document.querySelectorAll('.m-row-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const key = item.dataset.key;
-      openServiceModal(key);
-    });
+  // Open Add Maintenance from Dashboard Header & Manager Modal
+  document.getElementById('btnOpenAddMaintenanceQuick')?.addEventListener('click', openAddMaintenanceModal);
+  document.getElementById('btnOpenAddMaintenanceFromManager')?.addEventListener('click', () => {
+    closeAllModals();
+    openAddMaintenanceModal();
   });
 
-  // Add Service Form
+  // Maintenance Manager trigger
+  document.getElementById('btnViewAllMaintenance')?.addEventListener('click', openMaintenanceManager);
+
+  // Add Service Form trigger
   document.getElementById('btnOpenAddServiceForm')?.addEventListener('click', () => {
     closeAllModals();
     openServiceModal();
@@ -472,37 +708,45 @@ function closeAllModals() {
 function populateServiceModalDropdown() {
   const select = document.getElementById('serviceTypeSelect');
   if (!select) return;
-  const settings = maintenanceEngine.settings;
-  select.innerHTML = Object.keys(settings).map(k => `<option value="${k}">${settings[k].name}</option>`).join('');
+  const items = maintenanceEngine.items;
+  if (items.length === 0) {
+    select.innerHTML = `<option value="">-- Tidak ada komponen (Tambah dulu) --</option>`;
+    return;
+  }
+  select.innerHTML = items.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
 }
 
-function openServiceModal(preselectKey = null) {
+function openServiceModal(preselectId = null) {
   const modal = document.getElementById('modalAddService');
   if (!modal) return;
+
+  populateServiceModalDropdown();
 
   const typeSelect = document.getElementById('serviceTypeSelect');
   const odoInput = document.getElementById('serviceOdoInput');
   const dateInput = document.getElementById('serviceDateInput');
 
-  if (typeSelect && preselectKey) typeSelect.value = preselectKey;
+  if (typeSelect && preselectId) typeSelect.value = preselectId;
   if (odoInput) odoInput.value = Math.round(currentOdo);
   if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
 
   modal.classList.add('open');
 }
 
-async function handleServiceFormSubmit(e) {
+function handleServiceFormSubmit(e) {
   e.preventDefault();
-  const type = document.getElementById('serviceTypeSelect').value;
+  const id = document.getElementById('serviceTypeSelect').value;
   const odo = document.getElementById('serviceOdoInput').value;
   const date = document.getElementById('serviceDateInput').value;
   const notes = document.getElementById('serviceNotesInput').value;
-  
-  const items = [];
-  document.querySelectorAll('.part-cb:checked').forEach(cb => items.push(cb.value));
+
+  if (!id) {
+    showToast('Pilih komponen terlebih dahulu.', 'warning');
+    return;
+  }
 
   closeAllModals();
-  await maintenanceEngine.logService({ type, odo: Number(odo), date, notes, items });
+  maintenanceEngine.recordService(id, Number(odo), date, notes);
   renderMaintenanceReminders();
   showToast('Catatan servis berhasil disimpan!', 'success');
 }
@@ -510,29 +754,28 @@ async function handleServiceFormSubmit(e) {
 /* ==========================================================================
    EDIT INTERVAL CONTROLLER (SUPER FAST & SMOOTH)
    ========================================================================== */
-function openEditIntervalModal(key) {
+function openEditIntervalModal(id) {
   const modal = document.getElementById('modalEditInterval');
   if (!modal) return;
 
-  const setting = maintenanceEngine.settings[key];
-  if (!setting) return;
+  const item = maintenanceEngine.items.find(i => i.id === id);
+  if (!item) return;
 
   const titleEl = document.getElementById('editIntervalTitle');
   const keyInput = document.getElementById('editIntervalKey');
   const kmInput = document.getElementById('editIntervalKm');
   const moInput = document.getElementById('editIntervalMonths');
 
-  if (titleEl) titleEl.textContent = `Ubah Interval: ${setting.name}`;
-  if (keyInput) keyInput.value = key;
-  if (kmInput) kmInput.value = setting.intervalKm;
-  if (moInput) moInput.value = setting.intervalMonths;
+  if (titleEl) titleEl.textContent = `Ubah Interval: ${item.name}`;
+  if (keyInput) keyInput.value = id;
+  if (kmInput) kmInput.value = item.intervalKm;
+  if (moInput) moInput.value = item.intervalMonths;
 
-  // Highlight active preset buttons
   document.querySelectorAll('.btn-preset-km').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.val) === Number(setting.intervalKm));
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalKm));
   });
   document.querySelectorAll('.btn-preset-mo').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.val) === Number(setting.intervalMonths));
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalMonths));
   });
 
   modal.classList.add('open');
@@ -543,7 +786,6 @@ function setupEditIntervalModal() {
   const kmInput = document.getElementById('editIntervalKm');
   const moInput = document.getElementById('editIntervalMonths');
 
-  // Preset KM buttons
   document.querySelectorAll('.btn-preset-km').forEach(btn => {
     btn.addEventListener('click', () => {
       if (kmInput) kmInput.value = btn.dataset.val;
@@ -551,7 +793,6 @@ function setupEditIntervalModal() {
     });
   });
 
-  // Preset Month buttons
   document.querySelectorAll('.btn-preset-mo').forEach(btn => {
     btn.addEventListener('click', () => {
       if (moInput) moInput.value = btn.dataset.val;
@@ -560,24 +801,18 @@ function setupEditIntervalModal() {
   });
 
   if (form) {
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const key = document.getElementById('editIntervalKey').value;
-      const intervalKm = Number(kmInput.value) || 20000;
+      const id = document.getElementById('editIntervalKey').value;
+      const intervalKm = Number(kmInput.value) || 10000;
       const intervalMonths = Number(moInput.value) || 6;
 
-      const itemName = maintenanceEngine.settings[key] ? maintenanceEngine.settings[key].name : 'Item';
+      const item = maintenanceEngine.updateInterval(id, intervalKm, intervalMonths);
+      const itemName = item ? item.name : 'Komponen';
 
-      // 1. Instantly close modal (0ms UI latency)
       closeAllModals();
-
-      // 2. Synchronous in-memory & local state update
-      await maintenanceEngine.updateSetting(key, { intervalKm, intervalMonths });
-
-      // 3. Instantly re-render dashboard (60fps)
       renderMaintenanceReminders();
 
-      // 4. Show success toast
       showToast(`Interval ${itemName} diubah ke ${maintenanceEngine.formatNumber(intervalKm)} KM / ${intervalMonths} Bulan!`, 'success');
     });
   }
@@ -644,9 +879,7 @@ function playFlashBeep() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
-  } catch (e) {
-    // Silent fallback
-  }
+  } catch (e) {}
 }
 
 function setupFlashTestController() {
@@ -724,7 +957,6 @@ function setupFlashTestController() {
     }
   });
 
-  // Remote flash test sync listener
   subscribeFlashTest((payload) => {
     if (!payload) return;
     if (payload.active && !isFlashTestActive) {
@@ -735,21 +967,3 @@ function setupFlashTestController() {
     }
   });
 }
-
-/* ==========================================================================
-   SERVICE WORKER REGISTRATION (NATIVE PWA SUPPORT & FORCE UPDATE)
-   ========================================================================== */
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=20260827_sport_analog')
-      .then((reg) => {
-        console.log('[PWA] Service Worker Active (v20260827_sport_analog)');
-        reg.update();
-      })
-      .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
-  });
-}
-
-
-
-
