@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vehicle-monitor-2d-flat-v1';
+const CACHE_NAME = 'vehicle-monitor-v20260828_ultra_v6';
 
 // Install: Pre-cache static shell & skip waiting immediately
 self.addEventListener('install', (event) => {
@@ -11,7 +11,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          console.log('[SW] Deleting legacy cache:', key);
+          console.log('[SW] Purging old cache version:', key);
           return caches.delete(key);
         })
       );
