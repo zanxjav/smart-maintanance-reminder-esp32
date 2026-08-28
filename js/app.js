@@ -889,7 +889,7 @@ function toggleFlashTest() {
     fetch(`${FIREBASE_DB_URL}/commands/flashTest.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: false, timestamp: Date.now() })
+      body: JSON.stringify({ active: false, duration: 0, timestamp: Date.now() })
     }).catch(() => {});
 
     showToast('Flash Test selesai. Lampu indikator standby.', 'info');

@@ -623,7 +623,7 @@ void syncCommandsFromWeb() {
     }
     http.end();
 
-    // 2. Sync Flash Test Command (Pin 4 Orange LED)
+    // 2. Sync Flash Test Command (Pin 4 Orange LED - Tepat 5 Detik)
     String flashUrl = String(FIREBASE_HOST) + "/commands/flashTest.json";
     http.begin(firebaseClient, flashUrl);
     http.setReuse(true);
@@ -634,17 +634,19 @@ void syncCommandsFromWeb() {
         String payload = http.getString();
         if (payload.indexOf("\"active\":true") >= 0 || payload.indexOf("\"active\": true") >= 0) {
             if (!flashTestActive) {
-                int duration = 5000;
-                int durIdx = payload.indexOf("\"duration\":");
-                if (durIdx >= 0) {
-                    duration = payload.substring(durIdx + 11).toInt();
-                    if (duration <= 0 || duration > 30000) duration = 5000;
-                }
+                unsigned long duration = 5000; // Tepat 5 detik
                 portENTER_CRITICAL(&dataMux);
                 flashTestActive = true;
                 flashTestEndMs = millis() + duration;
                 portEXIT_CRITICAL(&dataMux);
-                Serial.printf("[WEB] Flash Test AKTIF: %d ms (Pin 4 LED Oren)\n", duration);
+                Serial.printf("[WEB] Flash Test AKTIF: %lu ms (Pin 4 LED Oren)\n", duration);
+
+                // Langsung bersihkan flag active di Firebase agar tidak re-trigger berulang kali
+                HTTPClient clearHttp;
+                clearHttp.begin(firebaseClient, flashUrl);
+                clearHttp.addHeader("Content-Type", "application/json");
+                clearHttp.PUT("{\"active\":false,\"duration\":0,\"timestamp\":0}");
+                clearHttp.end();
             }
         } else if (payload.indexOf("\"active\":false") >= 0 || payload.indexOf("\"active\": false") >= 0) {
             if (flashTestActive) {
