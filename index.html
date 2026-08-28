@@ -469,7 +469,7 @@
           </div>
 
           <div class="oled-mode-toggle-group">
-            <button type="button" class="btn-oled-mode active" id="btnOledModeSpeedo" data-mode="0">
+            <button type="button" class="btn-oled-mode active" id="btnOledModeSpeedo" data-mode="0" onclick="switchOledMode(0)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
@@ -477,7 +477,7 @@
               <span>Mode Biasa (Speedo)</span>
             </button>
 
-            <button type="button" class="btn-oled-mode" id="btnOledModeClock" data-mode="1">
+            <button type="button" class="btn-oled-mode" id="btnOledModeClock" data-mode="1" onclick="switchOledMode(1)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 14 10"/>
@@ -497,11 +497,11 @@
             <h3>Maintenance Reminders</h3>
             <span class="m-count-badge" id="mActiveCountBadge">0 Komponen</span>
           </div>
-          <button type="button" class="section-view-all" id="btnViewAllMaintenance">Kelola</button>
+          <button type="button" class="section-view-all" id="btnViewAllMaintenance" onclick="openMaintenanceManager()">Kelola</button>
         </div>
 
         <!-- Prominent & Clean Add Maintenance Action Bar (Zero Overlap on Mobile) -->
-        <button type="button" class="btn-add-maint-bar" id="btnOpenAddMaintenanceQuick" aria-label="Tambah Komponen Maintenance">
+        <button type="button" class="btn-add-maint-bar" id="btnOpenAddMaintenanceQuick" onclick="openAddMaintenanceModal()" aria-label="Tambah Komponen Maintenance">
           <div class="btn-add-maint-left">
             <div class="btn-add-maint-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
@@ -647,8 +647,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
           <h4 style="font-size: 0.95rem; font-weight: 700; color: #f8fafc;">Daftar Jadwal Perawatan</h4>
           <div style="display: flex; gap: 0.45rem;">
-            <button type="button" class="btn-pri" id="btnOpenAddMaintenanceFromManager" style="padding: 0.42rem 0.85rem; font-size: 0.78rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">+ Add Maintenance</button>
-            <button type="button" class="btn-pri" id="btnOpenAddServiceForm" style="padding: 0.42rem 0.85rem; font-size: 0.78rem;">+ Catat Servis</button>
+            <button type="button" class="btn-pri" id="btnOpenAddMaintenanceFromManager" onclick="closeAllModals(); openAddMaintenanceModal();" style="padding: 0.42rem 0.85rem; font-size: 0.78rem; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);">+ Add Maintenance</button>
+            <button type="button" class="btn-pri" id="btnOpenAddServiceForm" onclick="closeAllModals(); openServiceModal();" style="padding: 0.42rem 0.85rem; font-size: 0.78rem;">+ Catat Servis</button>
           </div>
         </div>
 

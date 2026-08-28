@@ -1,7 +1,7 @@
 /**
- * VEHICLE MONITOR - ULTRA FAST APP CONTROLLER (ZERO LAG & 60FPS)
+ * VEHICLE MONITOR - ULTRA FAST APP CONTROLLER (BULLETPROOF 60FPS)
  * 
- * Clean, lightweight orchestrator with instant Add & Delete Maintenance.
+ * Guaranteed execution on all devices with direct global handlers + delegated events.
  */
 
 import { 
@@ -23,9 +23,136 @@ let currentSpeedLimit = 60;
 let currentOdo = 97248;
 let currentTrip = 0;
 let currentStatus = "Normal";
+let currentOledMode = 0; // 0 = Speedo HUD, 1 = Full Clock
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 1. Instant Bootstrap
+/* ==========================================================================
+   GLOBAL EXPORTED CONTROLLERS (DIRECT ONCLICK ACCESSIBILITY)
+   ========================================================================== */
+
+export function openAddMaintenanceModal() {
+  const modal = document.getElementById('modalAddMaintenance');
+  if (!modal) return;
+
+  const odoInput = document.getElementById('addMaintLastOdo');
+  const dateInput = document.getElementById('addMaintLastDate');
+  const nameInput = document.getElementById('addMaintName');
+
+  if (odoInput) odoInput.value = Math.round(currentOdo);
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+  if (nameInput) nameInput.value = '';
+
+  document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
+  modal.classList.add('open');
+}
+
+export function openMaintenanceManager() {
+  renderMaintenanceReminders();
+  const modal = document.getElementById('modalMaintenanceManager');
+  if (modal) modal.classList.add('open');
+}
+
+export function closeAllModals() {
+  document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
+}
+
+export function switchOledMode(mode) {
+  currentOledMode = Number(mode) === 1 ? 1 : 0;
+  const btnSpeedo = document.getElementById('btnOledModeSpeedo');
+  const btnClock = document.getElementById('btnOledModeClock');
+  const badgeEl = document.getElementById('oledActiveBadge');
+  const descEl = document.getElementById('oledModeDesc');
+
+  if (btnSpeedo) btnSpeedo.classList.toggle('active', currentOledMode === 0);
+  if (btnClock) btnClock.classList.toggle('active', currentOledMode === 1);
+
+  if (badgeEl) {
+    badgeEl.textContent = currentOledMode === 1 ? 'Jam Full 🕒' : 'Mode Biasa';
+    badgeEl.style.background = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)';
+    badgeEl.style.color = currentOledMode === 1 ? '#c084fc' : '#38bdf8';
+    badgeEl.style.borderColor = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(56, 189, 248, 0.3)';
+  }
+
+  if (descEl) {
+    descEl.textContent = currentOledMode === 1 
+      ? 'Tampilan: Jam Digital Ekstra Besar (Full Screen)' 
+      : 'Tampilan: Dashboard Speedometer & Info Kendaraan';
+  }
+
+  writeDisplayMode(currentOledMode);
+  showToast(currentOledMode === 1 ? 'Layar OLED diset ke: Jam Full Layar 🕒' : 'Layar OLED diset ke: Mode Biasa (Speedometer)', 'info');
+}
+
+export function openEditIntervalModal(id) {
+  const modal = document.getElementById('modalEditInterval');
+  if (!modal) return;
+
+  const item = maintenanceEngine.items.find(i => i.id === id);
+  if (!item) return;
+
+  const titleEl = document.getElementById('editIntervalTitle');
+  const keyInput = document.getElementById('editIntervalKey');
+  const kmInput = document.getElementById('editIntervalKm');
+  const moInput = document.getElementById('editIntervalMonths');
+
+  if (titleEl) titleEl.textContent = `Ubah Interval: ${item.name}`;
+  if (keyInput) keyInput.value = id;
+  if (kmInput) kmInput.value = item.intervalKm;
+  if (moInput) moInput.value = item.intervalMonths;
+
+  document.querySelectorAll('.btn-preset-km').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalKm));
+  });
+  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalMonths));
+  });
+
+  modal.classList.add('open');
+}
+
+export function openDeleteConfirmModal(id, name) {
+  const modal = document.getElementById('modalConfirmDelete');
+  if (!modal) return;
+
+  const idInput = document.getElementById('deleteTargetKey');
+  const nameEl = document.getElementById('deleteTargetName');
+
+  if (idInput) idInput.value = id;
+  if (nameEl) nameEl.textContent = name;
+
+  modal.classList.add('open');
+}
+
+export function openServiceModal(preselectId = null) {
+  const modal = document.getElementById('modalAddService');
+  if (!modal) return;
+
+  populateServiceModalDropdown();
+
+  const typeSelect = document.getElementById('serviceTypeSelect');
+  const odoInput = document.getElementById('serviceOdoInput');
+  const dateInput = document.getElementById('serviceDateInput');
+
+  if (typeSelect && preselectId) typeSelect.value = preselectId;
+  if (odoInput) odoInput.value = Math.round(currentOdo);
+  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+
+  modal.classList.add('open');
+}
+
+// Bind to window for direct HTML onclick support
+window.openAddMaintenanceModal = openAddMaintenanceModal;
+window.openMaintenanceManager = openMaintenanceManager;
+window.closeAllModals = closeAllModals;
+window.switchOledMode = switchOledMode;
+window.openEditIntervalModal = openEditIntervalModal;
+window.openDeleteConfirmModal = openDeleteConfirmModal;
+window.openServiceModal = openServiceModal;
+
+/* ==========================================================================
+   INITIALIZATION ROUTINE
+   ========================================================================== */
+
+function initApp() {
   initClock();
   setupUIEvents();
   setupFlashTestController();
@@ -43,10 +170,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAnalogNeedle(0, currentSpeedLimit);
   handleVehicleDataUpdate({ speed: 0, rawSpeed: 0, odo: currentOdo, trip: currentTrip, status: currentStatus });
 
-  // 2. Start Telemetry
+  // Start Telemetry
   initFirebaseRealtime();
 
-  // 3. Subscriptions (Ultra clean, no recursion)
+  // Subscriptions (Ultra clean, no recursion)
   subscribeVehicleData((data) => {
     handleVehicleDataUpdate(data);
   });
@@ -61,7 +188,39 @@ document.addEventListener('DOMContentLoaded', () => {
   subscribeConnectionStatus((status) => {
     updateConnectionBadge(status.connected);
   });
-});
+
+  subscribeDisplayMode((mode) => {
+    const m = Number(mode) === 1 ? 1 : 0;
+    if (m !== currentOledMode) {
+      currentOledMode = m;
+      const btnSpeedo = document.getElementById('btnOledModeSpeedo');
+      const btnClock = document.getElementById('btnOledModeClock');
+      const badgeEl = document.getElementById('oledActiveBadge');
+      const descEl = document.getElementById('oledModeDesc');
+
+      if (btnSpeedo) btnSpeedo.classList.toggle('active', currentOledMode === 0);
+      if (btnClock) btnClock.classList.toggle('active', currentOledMode === 1);
+      if (badgeEl) {
+        badgeEl.textContent = currentOledMode === 1 ? 'Jam Full 🕒' : 'Mode Biasa';
+        badgeEl.style.background = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)';
+        badgeEl.style.color = currentOledMode === 1 ? '#c084fc' : '#38bdf8';
+        badgeEl.style.borderColor = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(56, 189, 248, 0.3)';
+      }
+      if (descEl) {
+        descEl.textContent = currentOledMode === 1 
+          ? 'Tampilan: Jam Digital Ekstra Besar (Full Screen)' 
+          : 'Tampilan: Dashboard Speedometer & Info Kendaraan';
+      }
+    }
+  });
+}
+
+// Immediate execution guarantee for ES Modules
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 /* ==========================================================================
    TOP CLOCK FORMATTING
@@ -132,7 +291,6 @@ function handleVehicleDataUpdate(data) {
     const odoEl = document.getElementById('valOdo');
     if (odoEl) odoEl.textContent = maintenanceEngine.formatNumber(roundedOdo);
     maintenanceEngine.setCurrentOdo(roundedOdo);
-    // Instant lightweight render on ODO changes
     renderMaintenanceReminders();
   }
 
@@ -267,7 +425,7 @@ function renderMaintenanceReminders() {
       dashContainer.innerHTML = `
         <div style="text-align: center; padding: 2rem 1rem; color: #94a3b8; background: #131b2e; border: 1px dashed rgba(255,255,255,0.12); border-radius: 14px;">
           <p style="font-weight: 600; font-size: 0.9rem; color: #cbd5e1;">Belum ada komponen maintenance.</p>
-          <p style="font-size: 0.78rem; margin-top: 4px; color: #94a3b8;">Klik tombol "+ Add Maintenance" di atas untuk menambahkan.</p>
+          <p style="font-size: 0.78rem; margin-top: 4px; color: #94a3b8;">Klik bar "+ Add Maintenance Baru" di atas untuk menambahkan.</p>
         </div>
       `;
     } else {
@@ -281,7 +439,7 @@ function renderMaintenanceReminders() {
         else if (item.status === 'WARNING') barColor = '#f59e0b';
 
         return `
-          <div class="m-row-item" data-id="${item.id}">
+          <div class="m-row-item" data-id="${item.id}" onclick="openServiceModal('${item.id}')">
             <div class="m-card-top">
               <div class="m-left-group">
                 <div class="m-icon-box ${item.colorClass}">
@@ -315,12 +473,6 @@ function renderMaintenanceReminders() {
           </div>
         `;
       }).join('');
-
-      dashContainer.querySelectorAll('.m-row-item').forEach(row => {
-        row.addEventListener('click', () => {
-          openServiceModal(row.dataset.id);
-        });
-      });
     }
   }
 
@@ -332,13 +484,9 @@ function renderMaintenanceReminders() {
         <div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8; background: #1e293b; border: 1px dashed rgba(255,255,255,0.15); border-radius: 14px;">
           <p style="font-weight: 700; font-size: 0.95rem; color: #f8fafc;">Daftar Perawatan Masih Kosong</p>
           <p style="font-size: 0.8rem; margin: 6px 0 14px; color: #94a3b8;">Tambahkan komponen kendaraan untuk mulai memantau.</p>
-          <button type="button" class="btn-pri" id="btnEmptyAddMaint" style="padding: 0.5rem 1.1rem; font-size: 0.82rem; background: linear-gradient(135deg, #10b981, #059669);">+ Tambah Maintenance Sekarang</button>
+          <button type="button" class="btn-pri" onclick="closeAllModals(); openAddMaintenanceModal();" style="padding: 0.5rem 1.1rem; font-size: 0.82rem; background: linear-gradient(135deg, #10b981, #059669);">+ Tambah Maintenance Sekarang</button>
         </div>
       `;
-      document.getElementById('btnEmptyAddMaint')?.addEventListener('click', () => {
-        closeAllModals();
-        openAddMaintenanceModal();
-      });
     } else {
       fullContainer.innerHTML = cards.map(item => {
         const pct = item.progressPercent;
@@ -351,7 +499,7 @@ function renderMaintenanceReminders() {
         else if (item.status === 'WARNING') barColor = '#f59e0b';
 
         return `
-          <div class="modal-service-card" data-id="${item.id}" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); padding: 1rem 1.1rem; border-radius: 14px; display: flex; flex-direction: column; gap: 0.75rem; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+          <div class="modal-service-card" data-id="${item.id}" style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); padding: 1rem 1.1rem; border-radius: 14px; display: flex; flex-direction: column; gap: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
               <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <div class="m-icon-box ${item.colorClass}" style="width: 36px; height: 36px; border-radius: 10px;">
@@ -394,9 +542,9 @@ function renderMaintenanceReminders() {
 
             <!-- Action buttons: Edit Interval, Log Service, Delete -->
             <div style="display: flex; gap: 0.45rem; justify-content: flex-end; align-items: center; padding-top: 0.45rem; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;">
-              <button type="button" class="btn-sec btn-edit-interval-item" data-id="${item.id}" style="padding: 0.35rem 0.7rem; font-size: 0.75rem; border-radius: 8px;">⚙️ Ubah Interval</button>
-              <button type="button" class="btn-pri btn-log-service-item" data-id="${item.id}" style="padding: 0.35rem 0.8rem; font-size: 0.75rem; border-radius: 8px;">+ Catat Servis</button>
-              <button type="button" class="btn-del-item" data-id="${item.id}" data-name="${item.name}" title="Hapus Komponen" aria-label="Hapus Komponen">
+              <button type="button" class="btn-sec btn-edit-interval-item" onclick="closeAllModals(); openEditIntervalModal('${item.id}');" style="padding: 0.35rem 0.7rem; font-size: 0.75rem; border-radius: 8px;">⚙️ Ubah Interval</button>
+              <button type="button" class="btn-pri btn-log-service-item" onclick="closeAllModals(); openServiceModal('${item.id}');" style="padding: 0.35rem 0.8rem; font-size: 0.75rem; border-radius: 8px;">+ Catat Servis</button>
+              <button type="button" class="btn-del-item" onclick="closeAllModals(); openDeleteConfirmModal('${item.id}', '${item.name.replace(/'/g, "\\'")}');" title="Hapus Komponen" aria-label="Hapus Komponen">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 <span>Hapus</span>
               </button>
@@ -404,31 +552,291 @@ function renderMaintenanceReminders() {
           </div>
         `;
       }).join('');
+    }
+  }
+}
 
-      fullContainer.querySelectorAll('.btn-edit-interval-item').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeAllModals();
-          openEditIntervalModal(btn.dataset.id);
-        });
-      });
+/* ==========================================================================
+   DELEGATED UI EVENTS & BOTTOM TAB BAR (100% BULLETPROOF)
+   ========================================================================== */
+function setupUIEvents() {
+  // Document-level delegated click listener
+  document.addEventListener('click', (e) => {
+    // 1. Add Maintenance bar button or manager add button
+    const addBtn = e.target.closest('#btnOpenAddMaintenanceQuick, #btnOpenAddMaintenanceFromManager');
+    if (addBtn) {
+      e.preventDefault();
+      closeAllModals();
+      openAddMaintenanceModal();
+      return;
+    }
 
-      fullContainer.querySelectorAll('.btn-log-service-item').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeAllModals();
-          openServiceModal(btn.dataset.id);
-        });
-      });
+    // 2. View All Maintenance trigger
+    const viewAllBtn = e.target.closest('#btnViewAllMaintenance');
+    if (viewAllBtn) {
+      e.preventDefault();
+      openMaintenanceManager();
+      return;
+    }
 
-      fullContainer.querySelectorAll('.btn-del-item').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeAllModals();
-          openDeleteConfirmModal(btn.dataset.id, btn.dataset.name);
-        });
+    // 3. OLED Mode Speedo button
+    const oledSpeedo = e.target.closest('#btnOledModeSpeedo');
+    if (oledSpeedo) {
+      e.preventDefault();
+      switchOledMode(0);
+      return;
+    }
+
+    // 4. OLED Mode Clock button
+    const oledClock = e.target.closest('#btnOledModeClock');
+    if (oledClock) {
+      e.preventDefault();
+      switchOledMode(1);
+      return;
+    }
+
+    // 5. Modal Closer buttons
+    const closeBtn = e.target.closest('.modal-close-trigger');
+    if (closeBtn) {
+      e.preventDefault();
+      closeAllModals();
+      return;
+    }
+
+    // 6. Backdrop click to close
+    if (e.target.classList && e.target.classList.contains('modal-backdrop')) {
+      closeAllModals();
+      return;
+    }
+  });
+
+  // Bottom Tab Navigation
+  const tabs = document.querySelectorAll('.nav-tab-item');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const tabName = tab.dataset.tab;
+      if (tabName === 'trip') {
+        writeResetTrip();
+        showToast('Trip meter berhasil direset ke 0.0 km', 'success');
+        setTimeout(() => {
+          document.getElementById('tabNavDashboard')?.classList.add('active');
+          tab.classList.remove('active');
+        }, 1200);
+      } else if (tabName === 'maintenance') {
+        openMaintenanceManager();
+      } else if (tabName === 'settings') {
+        document.getElementById('modalSpeedLimit')?.classList.add('open');
+      }
+    });
+  });
+
+  // Add Service Form trigger
+  document.getElementById('btnOpenAddServiceForm')?.addEventListener('click', () => {
+    closeAllModals();
+    openServiceModal();
+  });
+
+  const formService = document.getElementById('formAddService');
+  if (formService) formService.addEventListener('submit', handleServiceFormSubmit);
+
+  // Notifications button
+  document.getElementById('btnNotifications')?.addEventListener('click', () => {
+    showToast('Semua sensor dan sistem kendaraan normal terkoneksi.', 'success');
+  });
+
+  document.getElementById('btnMenu')?.addEventListener('click', () => {
+    openMaintenanceManager();
+  });
+
+  // Recent Activity View All
+  document.getElementById('btnViewAllActivity')?.addEventListener('click', () => {
+    showToast('Tidak ada alert aktif lainnya.', 'info');
+  });
+}
+
+function populateServiceModalDropdown() {
+  const select = document.getElementById('serviceTypeSelect');
+  if (!select) return;
+  const items = maintenanceEngine.items;
+  if (items.length === 0) {
+    select.innerHTML = `<option value="">-- Tidak ada komponen (Tambah dulu) --</option>`;
+    return;
+  }
+  select.innerHTML = items.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
+}
+
+function handleServiceFormSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('serviceTypeSelect').value;
+  const odo = document.getElementById('serviceOdoInput').value;
+  const date = document.getElementById('serviceDateInput').value;
+  const notes = document.getElementById('serviceNotesInput').value;
+
+  if (!id) {
+    showToast('Pilih komponen terlebih dahulu.', 'warning');
+    return;
+  }
+
+  closeAllModals();
+  maintenanceEngine.recordService(id, Number(odo), date, notes);
+  renderMaintenanceReminders();
+  showToast('Catatan servis berhasil disimpan!', 'success');
+}
+
+/* ==========================================================================
+   ADD MAINTENANCE FORM CONTROLLER (INSTANT 0MS SAVE)
+   ========================================================================== */
+function setupAddMaintenanceModal() {
+  const form = document.getElementById('formAddMaintenance');
+  const nameInput = document.getElementById('addMaintName');
+  const catSelect = document.getElementById('addMaintCategory');
+  const kmInput = document.getElementById('addMaintIntervalKm');
+  const moInput = document.getElementById('addMaintIntervalMonths');
+  const odoInput = document.getElementById('addMaintLastOdo');
+  const dateInput = document.getElementById('addMaintLastDate');
+  const reminderInput = document.getElementById('addMaintReminderKm');
+
+  // Preset chips delegation
+  document.getElementById('addPresetChipsList')?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip-preset-item');
+    if (!chip) return;
+    document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+
+    if (nameInput && chip.dataset.name) nameInput.value = chip.dataset.name;
+    if (catSelect && chip.dataset.cat) catSelect.value = chip.dataset.cat;
+    if (kmInput && chip.dataset.km) {
+      kmInput.value = chip.dataset.km;
+      document.querySelectorAll('.btn-add-km-pre').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === chip.dataset.km);
       });
     }
+    if (moInput && chip.dataset.mo) {
+      moInput.value = chip.dataset.mo;
+      document.querySelectorAll('.btn-add-mo-pre').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === chip.dataset.mo);
+      });
+    }
+  });
+
+  // Preset buttons
+  document.querySelectorAll('.btn-add-km-pre').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (kmInput) kmInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-add-km-pre').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  document.querySelectorAll('.btn-add-mo-pre').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (moInput) moInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-add-mo-pre').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Form submit handler (Instant 0ms Save)
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) {
+        showToast('Mohon masukkan nama komponen.', 'warning');
+        return;
+      }
+
+      const category = catSelect.value;
+      const intervalKm = Number(kmInput.value) || 10000;
+      const intervalMonths = Number(moInput.value) || 6;
+      const lastServiceOdo = Number(odoInput.value) || currentOdo;
+      const lastServiceDate = dateInput.value || new Date().toISOString().split('T')[0];
+      const reminderKm = Number(reminderInput.value) || 500;
+
+      closeAllModals();
+
+      // Instant in-memory + localStorage save
+      maintenanceEngine.addItem({
+        name,
+        category,
+        intervalKm,
+        intervalMonths,
+        lastServiceOdo,
+        lastServiceDate,
+        reminderKm
+      });
+
+      populateServiceModalDropdown();
+      renderMaintenanceReminders();
+
+      showToast(`Komponen "${name}" berhasil ditambahkan!`, 'success');
+    });
+  }
+}
+
+/* ==========================================================================
+   DELETE MAINTENANCE ITEM CONTROLLER
+   ========================================================================== */
+function setupDeleteModal() {
+  const confirmBtn = document.getElementById('btnConfirmDeleteAction');
+  if (!confirmBtn) return;
+
+  confirmBtn.addEventListener('click', () => {
+    const id = document.getElementById('deleteTargetKey')?.value;
+    if (!id) return;
+
+    const item = maintenanceEngine.items.find(i => i.id === id);
+    const itemName = item ? item.name : 'Komponen';
+
+    closeAllModals();
+
+    maintenanceEngine.deleteItem(id);
+
+    populateServiceModalDropdown();
+    renderMaintenanceReminders();
+
+    showToast(`"${itemName}" telah berhasil dihapus.`, 'info');
+  });
+}
+
+/* ==========================================================================
+   EDIT INTERVAL CONTROLLER (SUPER FAST & SMOOTH)
+   ========================================================================== */
+function setupEditIntervalModal() {
+  const form = document.getElementById('formEditInterval');
+  const kmInput = document.getElementById('editIntervalKm');
+  const moInput = document.getElementById('editIntervalMonths');
+
+  document.querySelectorAll('.btn-preset-km').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (kmInput) kmInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-preset-km').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (moInput) moInput.value = btn.dataset.val;
+      document.querySelectorAll('.btn-preset-mo').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editIntervalKey').value;
+      const intervalKm = Number(kmInput.value) || 10000;
+      const intervalMonths = Number(moInput.value) || 6;
+
+      const item = maintenanceEngine.updateInterval(id, intervalKm, intervalMonths);
+      const itemName = item ? item.name : 'Komponen';
+
+      closeAllModals();
+      renderMaintenanceReminders();
+
+      showToast(`Interval ${itemName} diubah ke ${maintenanceEngine.formatNumber(intervalKm)} KM / ${intervalMonths} Bulan!`, 'success');
+    });
   }
 }
 
@@ -489,336 +897,14 @@ function setupSpeedLimiterModal() {
 }
 
 /* ==========================================================================
-   ADD MAINTENANCE MODAL CONTROLLER (SUPER FAST & INTUITIVE)
+   OLED DISPLAY MODE CONTROLLER
    ========================================================================== */
-function openAddMaintenanceModal() {
-  const modal = document.getElementById('modalAddMaintenance');
-  if (!modal) return;
+function setupOledModeController() {
+  const btnSpeedo = document.getElementById('btnOledModeSpeedo');
+  const btnClock = document.getElementById('btnOledModeClock');
 
-  const odoInput = document.getElementById('addMaintLastOdo');
-  const dateInput = document.getElementById('addMaintLastDate');
-  const nameInput = document.getElementById('addMaintName');
-
-  if (odoInput) odoInput.value = Math.round(currentOdo);
-  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
-  if (nameInput) nameInput.value = '';
-
-  document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
-
-  modal.classList.add('open');
-}
-
-function setupAddMaintenanceModal() {
-  const form = document.getElementById('formAddMaintenance');
-  const nameInput = document.getElementById('addMaintName');
-  const catSelect = document.getElementById('addMaintCategory');
-  const kmInput = document.getElementById('addMaintIntervalKm');
-  const moInput = document.getElementById('addMaintIntervalMonths');
-  const odoInput = document.getElementById('addMaintLastOdo');
-  const dateInput = document.getElementById('addMaintLastDate');
-  const reminderInput = document.getElementById('addMaintReminderKm');
-
-  // Preset chips
-  document.querySelectorAll('.chip-preset-item').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip-preset-item').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-
-      if (nameInput && chip.dataset.name) nameInput.value = chip.dataset.name;
-      if (catSelect && chip.dataset.cat) catSelect.value = chip.dataset.cat;
-      if (kmInput && chip.dataset.km) {
-        kmInput.value = chip.dataset.km;
-        document.querySelectorAll('.btn-add-km-pre').forEach(b => {
-          b.classList.toggle('active', b.dataset.val === chip.dataset.km);
-        });
-      }
-      if (moInput && chip.dataset.mo) {
-        moInput.value = chip.dataset.mo;
-        document.querySelectorAll('.btn-add-mo-pre').forEach(b => {
-          b.classList.toggle('active', b.dataset.val === chip.dataset.mo);
-        });
-      }
-    });
-  });
-
-  // Preset buttons
-  document.querySelectorAll('.btn-add-km-pre').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (kmInput) kmInput.value = btn.dataset.val;
-      document.querySelectorAll('.btn-add-km-pre').forEach(b => b.classList.toggle('active', b === btn));
-    });
-  });
-
-  document.querySelectorAll('.btn-add-mo-pre').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (moInput) moInput.value = btn.dataset.val;
-      document.querySelectorAll('.btn-add-mo-pre').forEach(b => b.classList.toggle('active', b === btn));
-    });
-  });
-
-  // Form submit handler
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = nameInput.value.trim();
-      if (!name) {
-        showToast('Mohon masukkan nama komponen.', 'warning');
-        return;
-      }
-
-      const category = catSelect.value;
-      const intervalKm = Number(kmInput.value) || 10000;
-      const intervalMonths = Number(moInput.value) || 6;
-      const lastServiceOdo = Number(odoInput.value) || currentOdo;
-      const lastServiceDate = dateInput.value || new Date().toISOString().split('T')[0];
-      const reminderKm = Number(reminderInput.value) || 500;
-
-      closeAllModals();
-
-      maintenanceEngine.addItem({
-        name,
-        category,
-        intervalKm,
-        intervalMonths,
-        lastServiceOdo,
-        lastServiceDate,
-        reminderKm
-      });
-
-      populateServiceModalDropdown();
-      renderMaintenanceReminders();
-
-      showToast(`Komponen "${name}" berhasil ditambahkan!`, 'success');
-    });
-  }
-}
-
-/* ==========================================================================
-   DELETE MAINTENANCE ITEM CONTROLLER
-   ========================================================================== */
-function openDeleteConfirmModal(id, name) {
-  const modal = document.getElementById('modalConfirmDelete');
-  if (!modal) return;
-
-  const idInput = document.getElementById('deleteTargetKey');
-  const nameEl = document.getElementById('deleteTargetName');
-
-  if (idInput) idInput.value = id;
-  if (nameEl) nameEl.textContent = name;
-
-  modal.classList.add('open');
-}
-
-function setupDeleteModal() {
-  const confirmBtn = document.getElementById('btnConfirmDeleteAction');
-  if (!confirmBtn) return;
-
-  confirmBtn.addEventListener('click', () => {
-    const id = document.getElementById('deleteTargetKey')?.value;
-    if (!id) return;
-
-    const item = maintenanceEngine.items.find(i => i.id === id);
-    const itemName = item ? item.name : 'Komponen';
-
-    closeAllModals();
-
-    maintenanceEngine.deleteItem(id);
-
-    populateServiceModalDropdown();
-    renderMaintenanceReminders();
-
-    showToast(`"${itemName}" telah berhasil dihapus.`, 'info');
-  });
-}
-
-/* ==========================================================================
-   UI EVENTS & BOTTOM TAB BAR (SUPER FLUID)
-   ========================================================================== */
-function setupUIEvents() {
-  // Bottom Tab Navigation
-  const tabs = document.querySelectorAll('.nav-tab-item');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-
-      const tabName = tab.dataset.tab;
-      if (tabName === 'trip') {
-        writeResetTrip();
-        showToast('Trip meter berhasil direset ke 0.0 km', 'success');
-        setTimeout(() => {
-          document.getElementById('tabNavDashboard')?.classList.add('active');
-          tab.classList.remove('active');
-        }, 1200);
-      } else if (tabName === 'maintenance') {
-        openMaintenanceManager();
-      } else if (tabName === 'settings') {
-        document.getElementById('modalSpeedLimit')?.classList.add('open');
-      }
-    });
-  });
-
-  // Open Add Maintenance from Dashboard Header & Manager Modal
-  document.getElementById('btnOpenAddMaintenanceQuick')?.addEventListener('click', openAddMaintenanceModal);
-  document.getElementById('btnOpenAddMaintenanceFromManager')?.addEventListener('click', () => {
-    closeAllModals();
-    openAddMaintenanceModal();
-  });
-
-  // Maintenance Manager trigger
-  document.getElementById('btnViewAllMaintenance')?.addEventListener('click', openMaintenanceManager);
-
-  // Add Service Form trigger
-  document.getElementById('btnOpenAddServiceForm')?.addEventListener('click', () => {
-    closeAllModals();
-    openServiceModal();
-  });
-
-  const formService = document.getElementById('formAddService');
-  if (formService) formService.addEventListener('submit', handleServiceFormSubmit);
-
-  // Modal Closers
-  document.querySelectorAll('.modal-close-trigger').forEach(btn => {
-    btn.addEventListener('click', closeAllModals);
-  });
-  document.querySelectorAll('.modal-backdrop').forEach(m => {
-    m.addEventListener('click', (e) => { if (e.target === m) closeAllModals(); });
-  });
-
-  // Notifications button
-  document.getElementById('btnNotifications')?.addEventListener('click', () => {
-    showToast('Semua sensor dan sistem kendaraan normal terkoneksi.', 'success');
-  });
-
-  document.getElementById('btnMenu')?.addEventListener('click', () => {
-    openMaintenanceManager();
-  });
-
-  // Recent Activity View All
-  document.getElementById('btnViewAllActivity')?.addEventListener('click', () => {
-    showToast('Tidak ada alert aktif lainnya.', 'info');
-  });
-}
-
-function openMaintenanceManager() {
-  document.getElementById('modalMaintenanceManager')?.classList.add('open');
-}
-
-function closeAllModals() {
-  document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
-}
-
-function populateServiceModalDropdown() {
-  const select = document.getElementById('serviceTypeSelect');
-  if (!select) return;
-  const items = maintenanceEngine.items;
-  if (items.length === 0) {
-    select.innerHTML = `<option value="">-- Tidak ada komponen (Tambah dulu) --</option>`;
-    return;
-  }
-  select.innerHTML = items.map(i => `<option value="${i.id}">${i.name}</option>`).join('');
-}
-
-function openServiceModal(preselectId = null) {
-  const modal = document.getElementById('modalAddService');
-  if (!modal) return;
-
-  populateServiceModalDropdown();
-
-  const typeSelect = document.getElementById('serviceTypeSelect');
-  const odoInput = document.getElementById('serviceOdoInput');
-  const dateInput = document.getElementById('serviceDateInput');
-
-  if (typeSelect && preselectId) typeSelect.value = preselectId;
-  if (odoInput) odoInput.value = Math.round(currentOdo);
-  if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
-
-  modal.classList.add('open');
-}
-
-function handleServiceFormSubmit(e) {
-  e.preventDefault();
-  const id = document.getElementById('serviceTypeSelect').value;
-  const odo = document.getElementById('serviceOdoInput').value;
-  const date = document.getElementById('serviceDateInput').value;
-  const notes = document.getElementById('serviceNotesInput').value;
-
-  if (!id) {
-    showToast('Pilih komponen terlebih dahulu.', 'warning');
-    return;
-  }
-
-  closeAllModals();
-  maintenanceEngine.recordService(id, Number(odo), date, notes);
-  renderMaintenanceReminders();
-  showToast('Catatan servis berhasil disimpan!', 'success');
-}
-
-/* ==========================================================================
-   EDIT INTERVAL CONTROLLER (SUPER FAST & SMOOTH)
-   ========================================================================== */
-function openEditIntervalModal(id) {
-  const modal = document.getElementById('modalEditInterval');
-  if (!modal) return;
-
-  const item = maintenanceEngine.items.find(i => i.id === id);
-  if (!item) return;
-
-  const titleEl = document.getElementById('editIntervalTitle');
-  const keyInput = document.getElementById('editIntervalKey');
-  const kmInput = document.getElementById('editIntervalKm');
-  const moInput = document.getElementById('editIntervalMonths');
-
-  if (titleEl) titleEl.textContent = `Ubah Interval: ${item.name}`;
-  if (keyInput) keyInput.value = id;
-  if (kmInput) kmInput.value = item.intervalKm;
-  if (moInput) moInput.value = item.intervalMonths;
-
-  document.querySelectorAll('.btn-preset-km').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalKm));
-  });
-  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.val) === Number(item.intervalMonths));
-  });
-
-  modal.classList.add('open');
-}
-
-function setupEditIntervalModal() {
-  const form = document.getElementById('formEditInterval');
-  const kmInput = document.getElementById('editIntervalKm');
-  const moInput = document.getElementById('editIntervalMonths');
-
-  document.querySelectorAll('.btn-preset-km').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (kmInput) kmInput.value = btn.dataset.val;
-      document.querySelectorAll('.btn-preset-km').forEach(b => b.classList.toggle('active', b === btn));
-    });
-  });
-
-  document.querySelectorAll('.btn-preset-mo').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (moInput) moInput.value = btn.dataset.val;
-      document.querySelectorAll('.btn-preset-mo').forEach(b => b.classList.toggle('active', b === btn));
-    });
-  });
-
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const id = document.getElementById('editIntervalKey').value;
-      const intervalKm = Number(kmInput.value) || 10000;
-      const intervalMonths = Number(moInput.value) || 6;
-
-      const item = maintenanceEngine.updateInterval(id, intervalKm, intervalMonths);
-      const itemName = item ? item.name : 'Komponen';
-
-      closeAllModals();
-      renderMaintenanceReminders();
-
-      showToast(`Interval ${itemName} diubah ke ${maintenanceEngine.formatNumber(intervalKm)} KM / ${intervalMonths} Bulan!`, 'success');
-    });
-  }
+  btnSpeedo?.addEventListener('click', () => switchOledMode(0));
+  btnClock?.addEventListener('click', () => switchOledMode(1));
 }
 
 function updateConnectionBadge(connected) {
@@ -861,7 +947,7 @@ function showToast(message, type = 'info') {
 }
 
 /* ==========================================================================
-   FLASH TEST CONTROLLER (LAMPU OREN / PIN 4 WARNING INDICATOR)
+   FLASH TEST CONTROLLER
    ========================================================================== */
 let isFlashTestActive = false;
 let flashTestCountdownTimer = null;
@@ -968,52 +1054,5 @@ function setupFlashTestController() {
     } else if (!payload.active && isFlashTestActive) {
       stopFlashTest(false);
     }
-  });
-}
-
-/* ==========================================================================
-   OLED DISPLAY MODE CONTROLLER (DASHBOARD SPEEDO vs JAM FULL LAYAR)
-   ========================================================================== */
-let currentOledMode = 0; // 0 = Speedo HUD, 1 = Full Clock
-
-function setupOledModeController() {
-  const btnSpeedo = document.getElementById('btnOledModeSpeedo');
-  const btnClock = document.getElementById('btnOledModeClock');
-  const badgeEl = document.getElementById('oledActiveBadge');
-  const descEl = document.getElementById('oledModeDesc');
-
-  const updateUI = (mode) => {
-    currentOledMode = Number(mode) === 1 ? 1 : 0;
-    if (btnSpeedo) btnSpeedo.classList.toggle('active', currentOledMode === 0);
-    if (btnClock) btnClock.classList.toggle('active', currentOledMode === 1);
-
-    if (badgeEl) {
-      badgeEl.textContent = currentOledMode === 1 ? 'Jam Full 🕒' : 'Mode Biasa';
-      badgeEl.style.background = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.15)';
-      badgeEl.style.color = currentOledMode === 1 ? '#c084fc' : '#38bdf8';
-      badgeEl.style.borderColor = currentOledMode === 1 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(56, 189, 248, 0.3)';
-    }
-
-    if (descEl) {
-      descEl.textContent = currentOledMode === 1 
-        ? 'Tampilan: Jam Digital Ekstra Besar (Full Screen)' 
-        : 'Tampilan: Dashboard Speedometer & Info Kendaraan';
-    }
-  };
-
-  btnSpeedo?.addEventListener('click', () => {
-    updateUI(0);
-    writeDisplayMode(0);
-    showToast('Layar OLED diset ke: Mode Biasa (Speedometer)', 'info');
-  });
-
-  btnClock?.addEventListener('click', () => {
-    updateUI(1);
-    writeDisplayMode(1);
-    showToast('Layar OLED diset ke: Jam Full Layar 🕒', 'success');
-  });
-
-  subscribeDisplayMode((mode) => {
-    updateUI(mode);
   });
 }
