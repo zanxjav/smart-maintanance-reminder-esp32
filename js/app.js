@@ -162,7 +162,10 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(10px) scale(0.95)';
-    setTimeout(() => toast.remove(), 250);
+    setTimeout(() => {
+      if (typeof toast.remove === 'function') toast.remove();
+      else if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 250);
   }, 2500);
 }
 
